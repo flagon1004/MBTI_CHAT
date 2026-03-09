@@ -1,12 +1,7 @@
 {
-  "functions": {
-    "api/analyze.js": {
-      "runtime": "edge"
-    }
-  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/public/index.html" }
   ],
   "headers": [
     {
