@@ -19,7 +19,6 @@ export default async function handler(req, res) {
   try {
     const { scores, answers, responseTimes, typeKey } = req.body;
 
-    // ── 입력 검증
     if (!scores || !typeKey) {
       return res.status(400).json({ error: 'Invalid input' });
     }
@@ -47,7 +46,7 @@ export default async function handler(req, res) {
       };
     });
 
-    // ── 중도 점수 감지 (40~65% = 갈등 구간)
+    // ── 중도 점수 감지
     const pct = {
       E: Math.round(scores.E / 5 * 100), I: Math.round(scores.I / 5 * 100),
       S: Math.round(scores.S / 5 * 100), N: Math.round(scores.N / 5 * 100),
@@ -60,7 +59,7 @@ export default async function handler(req, res) {
       if (dominant <= 65) ambiguous.push(`${a}/${b}(${dominant}%)`);
     });
 
-    // ── Gemini 프롬프트 구성
+    // ── Gemini 프롬프트
     const prompt = `당신은 심리측정학 및 임상 상담 전문가입니다. MBTI Step II와 TCI 이론을 기반으로 아래 행동 데이터를 분석하십시오.
 
 [기초 MBTI 점수]
@@ -75,7 +74,7 @@ T/F: ${rtStats.TF.avg}ms (전체평균 대비 ${rtStats.TF.ratio}배)
 J/P: ${rtStats.JP.avg}ms (전체평균 대비 ${rtStats.JP.ratio}배)
 전체 평균: ${Math.round(totalAvg)}ms
 
-[중도적 점수 지표 (갈등 구간 40~65%)]
+[중도적 점수 지표]
 ${ambiguous.length > 0 ? ambiguous.join(', ') : '없음'}
 
 아래 JSON 형식으로만 응답하십시오. 다른 텍스트는 절대 포함하지 마십시오:
@@ -89,41 +88,42 @@ ${ambiguous.length > 0 ? ambiguous.join(', ') : '없음'}
     "detected": true또는false,
     "comment": "기질과 사회적 페르소나 간 갭을 1~2문장으로 한국어 서술. 갭이 없으면 null"
   },
-  "personalized_insight": "이 사람만의 고유한 심리 패턴을 2~3문장으로 한국어 서술. 일반적인 유형 설명이 아닌 응답 데이터에서 도출한 개인화된 통찰",
+  "personalized_insight": "이 사람만의 고유한 심리 패턴을 2~3문장으로 한국어 서술",
   "custom_do": "응답 데이터 기반 맞춤 실행 제언 1문장",
   "custom_dont": "응답 데이터 기반 맞춤 경계 사항 1문장"
 }`;
 
-    // ── Gemini API 호출
+    // ── Gemini API 호출 (모델명 수정)
     const GEMINI_KEY = process.env.GEMINI_API_KEY;
 
     if (!GEMINI_KEY) {
       return res.status(200).json({ success: false, fallback: true, error: 'No API key' });
     }
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 600,
-          },
-        }),
-      }
-    );
+    // 최신 모델명으로 변경
+    const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_KEY}`;
+
+    const geminiRes = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 600,
+        },
+      }),
+    });
 
     if (!geminiRes.ok) {
-      throw new Error(`Gemini API error: ${geminiRes.status}`);
+      const errBody = await geminiRes.text();
+      throw new Error(`Gemini API error: ${geminiRes.status} - ${errBody}`);
     }
 
     const geminiData = await geminiRes.json();
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
-    // ── JSON 파싱 (마크다운 펜스 제거)
+    // ── JSON 파싱
     const clean = rawText.replace(/```json|```/g, '').trim();
     const analysis = JSON.parse(clean);
 
