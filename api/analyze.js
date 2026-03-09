@@ -1,46 +1,43 @@
 // api/analyze.js — Vercel Serverless Function
-// API 키는 Vercel 환경변수(GEMINI_API_KEY)에서만 읽음
+// API 키는 Vercel 환경변수(GEMINI_API_KEY)에서만 읽음 → 브라우저 노출 없음
 
 export default async function handler(req, res) {
-  // CORS
+
+  // CORS 헤더 설정
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
-    });
+    return res.status(200).end();
   }
 
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const body = await req.json();
-    const { scores, answers, responseTimes, typeKey } = body;
+    const { scores, answers, responseTimes, typeKey } = req.body;
 
     // ── 입력 검증
     if (!scores || !typeKey) {
-      return new Response(JSON.stringify({ error: 'Invalid input' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      });
+      return res.status(400).json({ error: 'Invalid input' });
     }
 
     // ── 응답 시간 통계 계산
+    const indicatorMap = [
+      'EI','EI','EI','EI','EI',
+      'SN','SN','SN','SN','SN',
+      'TF','TF','TF','TF','TF',
+      'JP','JP','JP','JP','JP'
+    ];
     const rtByIndicator = { EI: [], SN: [], TF: [], JP: [] };
-    const indicatorMap = ['EI','EI','EI','EI','EI','SN','SN','SN','SN','SN','TF','TF','TF','TF','TF','JP','JP','JP','JP','JP'];
     responseTimes.forEach((rt, i) => {
       if (indicatorMap[i]) rtByIndicator[indicatorMap[i]].push(rt);
     });
 
-    const rtStats = {};
     const totalAvg = responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length;
+    const rtStats = {};
     Object.entries(rtByIndicator).forEach(([key, rts]) => {
       const avg = rts.reduce((a, b) => a + b, 0) / rts.length;
       rtStats[key] = {
@@ -50,7 +47,7 @@ export default async function handler(req, res) {
       };
     });
 
-    // ── 중도 점수 감지 (40~60% = 갈등 구간)
+    // ── 중도 점수 감지 (40~65% = 갈등 구간)
     const pct = {
       E: Math.round(scores.E / 5 * 100), I: Math.round(scores.I / 5 * 100),
       S: Math.round(scores.S / 5 * 100), N: Math.round(scores.N / 5 * 100),
@@ -86,7 +83,7 @@ ${ambiguous.length > 0 ? ambiguous.join(', ') : '없음'}
   "cognitive_dissonance": {
     "indicator": "가장 응답 지연이 높은 지표명(예:T/F)",
     "comment": "해당 지표의 심리적 갈등을 2문장으로 한국어 서술",
-    "intensity": "low|medium|high"
+    "intensity": "low또는medium또는high 중 하나"
   },
   "persona_gap": {
     "detected": true또는false,
@@ -99,6 +96,11 @@ ${ambiguous.length > 0 ? ambiguous.join(', ') : '없음'}
 
     // ── Gemini API 호출
     const GEMINI_KEY = process.env.GEMINI_API_KEY;
+
+    if (!GEMINI_KEY) {
+      return res.status(200).json({ success: false, fallback: true, error: 'No API key' });
+    }
+
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
       {
@@ -109,7 +111,6 @@ ${ambiguous.length > 0 ? ambiguous.join(', ') : '없음'}
           generationConfig: {
             temperature: 0.7,
             maxOutputTokens: 600,
-            responseMimeType: 'application/json',
           },
         }),
       }
@@ -122,27 +123,14 @@ ${ambiguous.length > 0 ? ambiguous.join(', ') : '없음'}
     const geminiData = await geminiRes.json();
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
-    // ── JSON 파싱 (펜스 제거 후)
+    // ── JSON 파싱 (마크다운 펜스 제거)
     const clean = rawText.replace(/```json|```/g, '').trim();
     const analysis = JSON.parse(clean);
 
-    return new Response(JSON.stringify({ success: true, analysis, typeKey }), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
+    return res.status(200).json({ success: true, analysis, typeKey });
 
   } catch (err) {
     console.error('Analyze error:', err);
-    // 폴백: 오류 시 기본 템플릿만 사용하도록 클라이언트에 신호
-    return new Response(JSON.stringify({ success: false, fallback: true, error: err.message }), {
-      status: 200, // 200으로 반환해 클라이언트가 폴백 처리
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
+    return res.status(200).json({ success: false, fallback: true, error: err.message });
   }
 }
