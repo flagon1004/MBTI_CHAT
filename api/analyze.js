@@ -1,9 +1,7 @@
 // api/analyze.js — Vercel Serverless Function
-// API 키는 Vercel 환경변수(GEMINI_API_KEY)에서만 읽음 → 브라우저 노출 없음
+// API 키는 Vercel 환경변수(GEMINI_API_KEY)에서만 읽음
 
-export const config = { runtime: 'edge' };
-
-export default async function handler(req) {
+export default async function handler(req, res) {
   // CORS
   if (req.method === 'OPTIONS') {
     return new Response(null, {
