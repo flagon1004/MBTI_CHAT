@@ -1,0 +1,1581 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>MBTI_CHAT-BOT</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Noto+Serif+KR:wght@300;400;500&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #13131a;
+    --surface2: #1a1a24;
+    --border: rgba(180,160,120,0.15);
+    --gold: #c8a96e;
+    --gold-light: #e8c98a;
+    --gold-dim: rgba(200,169,110,0.3);
+    --text: #e8e0d0;
+    --text-dim: rgba(232,224,208,0.5);
+    --text-faint: rgba(232,224,208,0.25);
+    --accent: #8b7355;
+    --E: #c8a96e; --I: #8eafc8;
+    --S: #a8c88e; --N: #c88ea8;
+    --T: #8eafc8; --F: #c8a98e;
+    --J: #a88ec8; --P: #c8c88e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Serif KR', serif;
+    overflow-x: hidden;
+  }
+
+  /* ── GRAIN OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; opacity: 0.6;
+  }
+
+  /* ── AMBIENT GLOW ── */
+  body::after {
+    content: '';
+    position: fixed;
+    top: -30vh; left: 50%; transform: translateX(-50%);
+    width: 60vw; height: 60vh;
+    background: radial-gradient(ellipse, rgba(200,169,110,0.06) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+  }
+
+  #app {
+    position: relative; z-index: 1;
+    min-height: 100dvh;
+    display: flex; flex-direction: column;
+    max-width: 480px; margin: 0 auto;
+  }
+
+  /* ══════════════════════════════
+     SCREENS
+  ══════════════════════════════ */
+  .screen { display: none; flex-direction: column; min-height: 100dvh; }
+  .screen.active { display: flex; }
+
+  /* ── FADE ANIMATION ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes shimmer {
+    0%,100% { opacity: 0.4; }
+    50%      { opacity: 1; }
+  }
+  @keyframes lineGrow {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(200,169,110,0.3); }
+    50%      { box-shadow: 0 0 0 8px rgba(200,169,110,0); }
+  }
+
+  /* ══════════════════════════════
+     INTRO SCREEN
+  ══════════════════════════════ */
+  #intro {
+    justify-content: center; align-items: center;
+    padding: 48px 32px; text-align: center; gap: 0;
+  }
+
+  .intro-ornament {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 11px; letter-spacing: 0.4em;
+    color: var(--gold); text-transform: uppercase;
+    animation: fadeUp 1s ease both;
+    margin-bottom: 32px;
+  }
+
+  .intro-divider {
+    width: 48px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    margin: 0 auto 40px;
+    transform-origin: center;
+    animation: lineGrow 1.2s ease 0.3s both;
+  }
+
+  .intro-logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(36px, 10vw, 52px);
+    font-weight: 300; letter-spacing: 0.08em;
+    color: var(--text); line-height: 1.1;
+    animation: fadeUp 1s ease 0.2s both;
+    margin-bottom: 8px;
+  }
+  .intro-logo span { color: var(--gold); font-style: italic; }
+
+  .intro-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.25em;
+    color: var(--text-dim); text-transform: uppercase;
+    animation: fadeUp 1s ease 0.35s both;
+    margin-bottom: 56px;
+  }
+
+  .intro-desc {
+    font-size: 14px; line-height: 2;
+    color: var(--text-dim); max-width: 320px;
+    animation: fadeUp 1s ease 0.5s both;
+    margin-bottom: 64px;
+  }
+
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 12px;
+    padding: 16px 40px;
+    background: transparent;
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    font-family: 'Noto Serif KR', serif;
+    font-size: 13px; letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: all 0.4s ease;
+    animation: fadeUp 1s ease 0.65s both;
+    position: relative; overflow: hidden;
+  }
+  .btn-primary::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: var(--gold);
+    transform: translateX(-100%);
+    transition: transform 0.4s ease;
+    z-index: -1;
+  }
+  .btn-primary:hover { color: var(--bg); }
+  .btn-primary:hover::before { transform: translateX(0); }
+  .btn-primary:active { transform: scale(0.98); }
+
+  .intro-note {
+    margin-top: 40px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.15em;
+    color: var(--text-faint);
+    animation: fadeUp 1s ease 0.8s both;
+  }
+
+  /* ══════════════════════════════
+     QUESTION SCREEN
+  ══════════════════════════════ */
+  #question { padding: 0; }
+
+  .q-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 10;
+    backdrop-filter: blur(12px);
+  }
+
+  .q-header-top {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .q-logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 14px; font-weight: 300; letter-spacing: 0.2em;
+    color: var(--gold);
+  }
+
+  .q-counter {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; color: var(--text-dim);
+    letter-spacing: 0.1em;
+  }
+  .q-counter span { color: var(--gold); }
+
+  .progress-track {
+    height: 2px; background: var(--border);
+    border-radius: 1px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--gold));
+    border-radius: 1px;
+    transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  .q-body {
+    flex: 1; padding: 36px 24px 120px;
+    display: flex; flex-direction: column; gap: 32px;
+  }
+
+  .q-indicator {
+    display: flex; align-items: center; gap: 10px;
+    animation: fadeIn 0.4s ease both;
+  }
+  .q-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.2em;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .q-badge.E { border-color: var(--E); color: var(--E); }
+  .q-badge.I { border-color: var(--I); color: var(--I); }
+  .q-badge.S { border-color: var(--S); color: var(--S); }
+  .q-badge.N { border-color: var(--N); color: var(--N); }
+  .q-badge.T { border-color: var(--T); color: var(--T); }
+  .q-badge.F { border-color: var(--F); color: var(--F); }
+  .q-badge.J { border-color: var(--J); color: var(--J); }
+  .q-badge.P { border-color: var(--P); color: var(--P); }
+
+  .q-text {
+    font-size: clamp(17px, 4.5vw, 20px);
+    font-weight: 300; line-height: 1.8;
+    color: var(--text); letter-spacing: 0.02em;
+    animation: fadeUp 0.5s ease 0.1s both;
+  }
+
+  .q-context {
+    font-size: 12px; color: var(--text-dim);
+    font-family: 'DM Mono', monospace; letter-spacing: 0.12em;
+    padding: 12px 16px;
+    border-left: 2px solid var(--gold-dim);
+    animation: fadeUp 0.5s ease 0.2s both;
+  }
+
+  .choices { display: flex; flex-direction: column; gap: 12px; }
+
+  .choice-btn {
+    display: flex; align-items: flex-start; gap: 16px;
+    padding: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: left;
+    animation: fadeUp 0.5s ease both;
+    position: relative; overflow: hidden;
+  }
+  .choice-btn:nth-child(1) { animation-delay: 0.25s; }
+  .choice-btn:nth-child(2) { animation-delay: 0.35s; }
+
+  .choice-btn::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(200,169,110,0.06), transparent);
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .choice-btn:hover::before { opacity: 1; }
+  .choice-btn:hover { border-color: var(--gold-dim); }
+  .choice-btn:active { transform: scale(0.99); }
+
+  .choice-btn.selected {
+    border-color: var(--gold);
+    background: rgba(200,169,110,0.08);
+  }
+  .choice-btn.selected::before { opacity: 1; }
+
+  .choice-key {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px; font-weight: 300; font-style: italic;
+    color: var(--gold); flex-shrink: 0; line-height: 1;
+    margin-top: 2px;
+  }
+
+  .choice-text {
+    font-size: 14px; line-height: 1.75;
+    color: var(--text-dim);
+    transition: color 0.3s;
+  }
+  .choice-btn:hover .choice-text,
+  .choice-btn.selected .choice-text { color: var(--text); }
+
+  .q-footer {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 480px;
+    padding: 16px 24px 32px;
+    background: linear-gradient(to top, var(--bg) 70%, transparent);
+    z-index: 10;
+  }
+
+  .btn-next {
+    width: 100%; padding: 16px;
+    background: var(--gold);
+    border: none; color: var(--bg);
+    font-family: 'Noto Serif KR', serif;
+    font-size: 13px; letter-spacing: 0.2em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    opacity: 0; pointer-events: none;
+  }
+  .btn-next.visible { opacity: 1; pointer-events: all; }
+  .btn-next:hover { background: var(--gold-light); }
+  .btn-next:active { transform: scaleY(0.97); }
+
+  /* ══════════════════════════════
+     ANALYSIS SCREEN
+  ══════════════════════════════ */
+  #analysis {
+    justify-content: center; align-items: center;
+    padding: 48px 32px; text-align: center; gap: 32px;
+  }
+
+  .analysis-ring {
+    width: 96px; height: 96px;
+    border: 1px solid var(--border);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 2s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .analysis-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 24px; font-weight: 300; letter-spacing: 0.1em;
+    color: var(--text);
+  }
+
+  .analysis-steps {
+    display: flex; flex-direction: column; gap: 12px;
+    width: 100%; max-width: 280px;
+  }
+
+  .step-item {
+    display: flex; align-items: center; gap: 12px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 0.12em;
+    color: var(--text-faint);
+    transition: color 0.5s;
+  }
+  .step-item.done { color: var(--text-dim); }
+  .step-item.active { color: var(--gold); animation: shimmer 1.5s ease infinite; }
+
+  .step-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--text-faint); flex-shrink: 0;
+    transition: background 0.5s;
+  }
+  .step-item.done .step-dot { background: var(--gold-dim); }
+  .step-item.active .step-dot { background: var(--gold); animation: pulse 1.5s ease infinite; }
+
+  /* ══════════════════════════════
+     RESULT SCREEN
+  ══════════════════════════════ */
+  #result { padding-bottom: 60px; }
+
+  .result-hero {
+    padding: 48px 24px 40px;
+    text-align: center;
+    background: linear-gradient(180deg, var(--surface) 0%, transparent 100%);
+    border-bottom: 1px solid var(--border);
+    position: relative; overflow: hidden;
+  }
+
+  .result-hero::before {
+    content: '';
+    position: absolute; top: -40px; left: 50%; transform: translateX(-50%);
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(200,169,110,0.12), transparent 70%);
+    pointer-events: none;
+  }
+
+  .result-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.3em; color: var(--gold);
+    text-transform: uppercase; margin-bottom: 16px;
+  }
+
+  .result-type {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(64px, 18vw, 88px);
+    font-weight: 300; letter-spacing: 0.12em;
+    color: var(--text); line-height: 1;
+    margin-bottom: 16px;
+    animation: fadeUp 0.8s ease both;
+  }
+
+  .result-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 18px; font-style: italic; font-weight: 300;
+    color: var(--gold); letter-spacing: 0.08em;
+    margin-bottom: 8px;
+    animation: fadeUp 0.8s ease 0.1s both;
+  }
+
+  .result-subtitle {
+    font-size: 13px; color: var(--text-dim); line-height: 1.6;
+    animation: fadeUp 0.8s ease 0.2s both;
+  }
+
+  .result-bars {
+    display: flex; flex-direction: column; gap: 0;
+    padding: 32px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .bar-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+    animation: fadeUp 0.6s ease both;
+  }
+  .bar-row:last-child { border-bottom: none; }
+  .bar-row:nth-child(1) { animation-delay: 0.1s; }
+  .bar-row:nth-child(2) { animation-delay: 0.2s; }
+  .bar-row:nth-child(3) { animation-delay: 0.3s; }
+  .bar-row:nth-child(4) { animation-delay: 0.4s; }
+
+  .bar-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 0.15em;
+    color: var(--text-dim); width: 10px; flex-shrink: 0;
+  }
+
+  .bar-track {
+    flex: 1; height: 4px; background: var(--surface2);
+    border-radius: 2px; overflow: hidden; position: relative;
+  }
+
+  .bar-fill {
+    height: 100%; border-radius: 2px;
+    animation: barGrow 1s cubic-bezier(0.4,0,0.2,1) both;
+  }
+  @keyframes barGrow {
+    from { width: 0 !important; }
+  }
+
+  .bar-pct {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; color: var(--text-dim); width: 28px;
+    text-align: right; flex-shrink: 0;
+  }
+
+  .bar-label-r {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 0.15em;
+    color: var(--text-faint); width: 10px; flex-shrink: 0;
+  }
+
+  .result-sections { display: flex; flex-direction: column; gap: 0; }
+
+  .section {
+    padding: 28px 24px;
+    border-bottom: 1px solid var(--border);
+    animation: fadeUp 0.6s ease both;
+  }
+
+  .section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; letter-spacing: 0.3em; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 6px;
+  }
+
+  .section-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px; font-weight: 300; letter-spacing: 0.05em;
+    color: var(--text); margin-bottom: 16px;
+  }
+
+  .metaphor-card {
+    display: flex; align-items: center; gap: 16px;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    margin-bottom: 14px;
+  }
+
+  .metaphor-icon { font-size: 28px; flex-shrink: 0; }
+
+  .metaphor-body {}
+  .metaphor-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 15px; font-style: italic; color: var(--gold);
+    margin-bottom: 4px;
+  }
+  .metaphor-desc {
+    font-size: 12px; line-height: 1.7; color: var(--text-dim);
+  }
+
+  .do-dont {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    padding: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .do-card, .dont-card {
+    padding: 20px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+
+  .do-card { border-top: 2px solid var(--gold); }
+  .dont-card { border-top: 2px solid var(--accent); }
+
+  .card-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; letter-spacing: 0.25em;
+    margin-bottom: 14px;
+  }
+  .do-card .card-label { color: var(--gold); }
+  .dont-card .card-label { color: var(--accent); }
+
+  .card-items { display: flex; flex-direction: column; gap: 8px; }
+  .card-item {
+    font-size: 12px; line-height: 1.5; color: var(--text-dim);
+    display: flex; gap: 8px; align-items: flex-start;
+  }
+  .card-item::before {
+    content: '—'; color: var(--text-faint); flex-shrink: 0;
+  }
+
+  .stress-section {
+    padding: 28px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stress-bar-wrap {
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    margin-top: 16px;
+  }
+
+  .stress-bar-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.15em;
+    color: var(--text-dim); margin-bottom: 10px;
+    display: flex; justify-content: space-between;
+  }
+
+  .stress-track {
+    height: 6px; background: var(--surface2); border-radius: 3px;
+    overflow: hidden; margin-bottom: 16px;
+  }
+  .stress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--gold));
+    border-radius: 3px;
+    animation: barGrow 1.2s ease 0.5s both;
+  }
+
+  .stress-text {
+    font-size: 13px; line-height: 1.8; color: var(--text-dim);
+  }
+
+  .result-cta {
+    padding: 32px 24px;
+    display: flex; flex-direction: column; gap: 12px;
+    align-items: center;
+  }
+
+  .btn-share {
+    width: 100%; padding: 15px;
+    background: transparent;
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    font-family: 'Noto Serif KR', serif;
+    font-size: 13px; letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  .btn-share:hover { background: rgba(200,169,110,0.08); }
+
+  .btn-retry {
+    background: none; border: none;
+    color: var(--text-faint);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.2em;
+    cursor: pointer; padding: 8px;
+    transition: color 0.3s;
+    text-decoration: underline; text-underline-offset: 4px;
+  }
+  .btn-retry:hover { color: var(--text-dim); }
+
+
+  /* ══════════════════════════════
+     AI INSIGHT SECTION
+  ══════════════════════════════ */
+  .ai-insight-section {
+    padding: 0 24px 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+
+  .ai-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 20px 0 8px;
+  }
+
+  .ai-badge {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px; font-style: italic; font-weight: 300;
+    color: var(--gold); letter-spacing: 0.06em;
+  }
+
+  .ai-powered {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; letter-spacing: 0.2em; color: var(--text-faint);
+    text-transform: uppercase;
+  }
+
+  .ai-card {
+    padding: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 10px;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  .ai-card-highlight {
+    border-color: rgba(200,169,110,0.3);
+    background: rgba(200,169,110,0.04);
+  }
+
+  .ai-card-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase;
+    color: var(--text-faint);
+  }
+
+  .ai-indicator-row {
+    display: flex; align-items: center; gap: 10px;
+  }
+
+  .ai-indicator-tag {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 18px; font-style: italic; color: var(--gold);
+    padding: 2px 10px; border: 1px solid var(--gold-dim);
+  }
+
+  .ai-intensity {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; letter-spacing: 0.2em;
+    padding: 3px 8px; border-radius: 2px;
+  }
+  .ai-intensity.high { background: rgba(200,80,80,0.15); color: #e08080; }
+  .ai-intensity.medium { background: rgba(200,169,110,0.15); color: var(--gold); }
+  .ai-intensity.low { background: rgba(80,160,120,0.15); color: #80c8a0; }
+
+  .ai-card-text {
+    font-size: 13px; line-height: 1.85; color: var(--text-dim);
+    font-family: 'Noto Serif KR', serif;
+  }
+
+  .ai-custom-wrap {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+
+  .ai-custom-do, .ai-custom-dont {
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .ai-custom-do { border-top: 2px solid var(--gold); }
+  .ai-custom-dont { border-top: 2px solid var(--accent); }
+
+  /* AI Loading */
+  .ai-loading {
+    padding: 28px 24px;
+    display: flex; justify-content: center;
+  }
+
+  .ai-loading-inner {
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .ai-loading-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--gold);
+    animation: dotPulse 1.4s ease infinite;
+  }
+  .ai-loading-dot:nth-child(2) { animation-delay: 0.2s; }
+  .ai-loading-dot:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes dotPulse {
+    0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+    40% { opacity: 1; transform: scale(1); }
+  }
+
+  .ai-loading-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.2em; color: var(--text-faint);
+    margin-left: 4px;
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 2px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ════════ INTRO ════════ -->
+  <div class="screen active" id="intro">
+    <p class="intro-ornament">심층 성격 분석 시스템</p>
+    <div class="intro-divider"></div>
+    <h1 class="intro-logo">MBTI<span>_</span><br>CHAT·BOT</h1>
+    <p class="intro-sub">Behavioral Analysis · v1.0</p>
+    <p class="intro-desc">
+      단순한 선호가 아닌<br>
+      실제 행동 패턴을 기반으로<br>
+      당신의 본연적 기질을 분석합니다.
+    </p>
+    <button class="btn-primary" onclick="startQuiz()">
+      <span>분석 시작하기</span>
+    </button>
+    <p class="intro-note">총 20문항 · 약 5분 소요</p>
+  </div>
+
+  <!-- ════════ QUESTION ════════ -->
+  <div class="screen" id="question">
+    <div class="q-header">
+      <div class="q-header-top">
+        <span class="q-logo">MBTI_CHAT·BOT</span>
+        <span class="q-counter"><span id="q-num">1</span> / 20</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width:5%"></div>
+      </div>
+    </div>
+
+    <div class="q-body">
+      <div class="q-indicator">
+        <span class="q-badge" id="q-badge">E / I</span>
+      </div>
+      <p class="q-text" id="q-text">계획 없는 휴일이 생겼을 때, 당신이 가장 먼저 하는 것은?</p>
+      <p class="q-context" id="q-context">SITUATION · 에너지 충전 방식</p>
+      <div class="choices" id="choices">
+        <button class="choice-btn" onclick="selectChoice(0)">
+          <span class="choice-key">A</span>
+          <span class="choice-text" id="choice-a">누구라도 불러서 밖으로 나간다</span>
+        </button>
+        <button class="choice-btn" onclick="selectChoice(1)">
+          <span class="choice-key">B</span>
+          <span class="choice-text" id="choice-b">밀린 잠을 자거나 혼자 시간을 보낸다</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="q-footer">
+      <button class="btn-next" id="btn-next" onclick="nextQuestion()">다음 문항으로</button>
+    </div>
+  </div>
+
+  <!-- ════════ ANALYSIS ════════ -->
+  <div class="screen" id="analysis">
+    <div class="analysis-ring"></div>
+    <h2 class="analysis-title">분석 중입니다</h2>
+    <div class="analysis-steps">
+      <div class="step-item active" id="step-0">
+        <div class="step-dot"></div><span>응답 데이터 정량 분석</span>
+      </div>
+      <div class="step-item" id="step-1">
+        <div class="step-dot"></div><span>인지적 부조화 감지</span>
+      </div>
+      <div class="step-item" id="step-2">
+        <div class="step-dot"></div><span>기질 · 성격 교차 검증</span>
+      </div>
+      <div class="step-item" id="step-3">
+        <div class="step-dot"></div><span>심층 리포트 생성</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ RESULT (ENFP sample) ════════ -->
+  <div class="screen" id="result">
+    <div class="result-hero">
+      <p class="result-tag">당신의 유형</p>
+      <h2 class="result-type" id="res-type">ENFP</h2>
+      <p class="result-title" id="res-title">무지개색 탐험가</p>
+      <p class="result-subtitle" id="res-subtitle">가능성의 지평선을 끊임없이 넓혀가는<br>열정적인 연결의 건축가</p>
+    </div>
+
+    <!-- score bars -->
+    <div class="result-bars">
+      <div class="bar-row">
+        <span class="bar-label" style="color:var(--E)">E</span>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:72%;background:linear-gradient(90deg,var(--accent),var(--E))"></div>
+        </div>
+        <span class="bar-pct">72%</span>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:28%;background:var(--surface2);opacity:0.3"></div>
+        </div>
+        <span class="bar-label-r" style="color:var(--I)">I</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label" style="color:var(--S)">S</span>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:30%;background:var(--surface2);opacity:0.3"></div>
+        </div>
+        <span class="bar-pct">30%</span>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:70%;background:linear-gradient(90deg,var(--accent),var(--N))"></div>
+        </div>
+        <span class="bar-label-r" style="color:var(--N)">N</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label" style="color:var(--T)">T</span>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:35%;background:var(--surface2);opacity:0.3"></div>
+        </div>
+        <span class="bar-pct">35%</span>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:65%;background:linear-gradient(90deg,var(--accent),var(--F))"></div>
+        </div>
+        <span class="bar-label-r" style="color:var(--F)">F</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label" style="color:var(--J)">J</span>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:28%;background:var(--surface2);opacity:0.3"></div>
+        </div>
+        <span class="bar-pct">28%</span>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:72%;background:linear-gradient(90deg,var(--accent),var(--P))"></div>
+        </div>
+        <span class="bar-label-r" style="color:var(--P)">P</span>
+      </div>
+    </div>
+
+    <!-- metaphor sections -->
+    <div class="result-sections">
+      <div class="section">
+        <p class="section-label">Energy · 에너지</p>
+        <p class="section-title">태양광 패널</p>
+        <div class="metaphor-card">
+          <span class="metaphor-icon">☀️</span>
+          <div class="metaphor-body">
+            <p class="metaphor-name">Solar Panel</p>
+            <p class="metaphor-desc">사람들과 아이디어를 나눌 때 에너지가 풀(Full)로 충전됩니다. 혼자 있는 시간이 길어지면 배터리가 서서히 방전되는 것을 느낍니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="section-label">Perception · 인식</p>
+        <p class="section-title">망원경</p>
+        <div class="metaphor-card">
+          <span class="metaphor-icon">🔭</span>
+          <div class="metaphor-body">
+            <p class="metaphor-name">Telescope</p>
+            <p class="metaphor-desc">현재의 사실보다 미래의 가능성과 비유에 심장이 뜁니다. 눈앞의 데이터보다 수평선 너머의 패턴을 먼저 감지합니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="section-label">Decision · 판단</p>
+        <p class="section-title">공감 레이더</p>
+        <div class="metaphor-card">
+          <span class="metaphor-icon">📡</span>
+          <div class="metaphor-body">
+            <p class="metaphor-name">Empathy Radar</p>
+            <p class="metaphor-desc">타인의 감정 변화를 누구보다 빠르게 감지하고 공명합니다. 논리보다 관계의 온도가 결정의 기준이 됩니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="section-label">Lifestyle · 생활방식</p>
+        <p class="section-title">어드벤처 로그</p>
+        <div class="metaphor-card">
+          <span class="metaphor-icon">🗺️</span>
+          <div class="metaphor-body">
+            <p class="metaphor-name">Adventure Log</p>
+            <p class="metaphor-desc">계획된 일정보다 예기치 못한 우연한 풍경에서 행복을 느낍니다. 삶은 완성된 지도가 아닌 실시간으로 그려지는 항해도입니다.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- do & dont -->
+    <div class="do-dont">
+      <div class="do-card">
+        <p class="card-label">DO ✓</p>
+        <div class="card-items">
+          <span class="card-item">영감 노트 즉시 기록</span>
+          <span class="card-item">다양한 분야 연결 시도</span>
+          <span class="card-item">감정 경계 설정 연습</span>
+        </div>
+      </div>
+      <div class="dont-card">
+        <p class="card-label">DON'T ✗</p>
+        <div class="card-items">
+          <span class="card-item">과도한 타인 승인 욕구</span>
+          <span class="card-item">동시 다발적 프로젝트</span>
+          <span class="card-item">갈등 회피를 위한 침묵</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- stress -->
+    
+    <!-- ════════ AI INSIGHT SECTION ════════ -->
+    <div class="ai-insight-section" id="ai-insight-section" style="display:none;">
+      <div class="ai-header">
+        <span class="ai-badge">✦ AI 심층 분석</span>
+        <span class="ai-powered">Gemini 1.5 Flash</span>
+      </div>
+
+      <!-- 인지적 부조화 -->
+      <div class="ai-card" id="ai-dissonance">
+        <div class="ai-card-label">인지적 부조화 감지</div>
+        <div class="ai-indicator-row">
+          <span class="ai-indicator-tag" id="ai-indicator-tag">T/F</span>
+          <span class="ai-intensity" id="ai-intensity">HIGH</span>
+        </div>
+        <p class="ai-card-text" id="ai-dissonance-text"></p>
+      </div>
+
+      <!-- 페르소나 갭 -->
+      <div class="ai-card" id="ai-persona" style="display:none;">
+        <div class="ai-card-label">기질 vs 페르소나 갭</div>
+        <p class="ai-card-text" id="ai-persona-text"></p>
+      </div>
+
+      <!-- 개인화 통찰 -->
+      <div class="ai-card ai-card-highlight">
+        <div class="ai-card-label">나만의 심리 패턴</div>
+        <p class="ai-card-text" id="ai-insight-text"></p>
+      </div>
+
+      <!-- 맞춤 Do/Don't -->
+      <div class="ai-custom-wrap">
+        <div class="ai-custom-do">
+          <div class="ai-card-label" style="color:var(--gold)">맞춤 DO ✦</div>
+          <p class="ai-card-text" id="ai-custom-do"></p>
+        </div>
+        <div class="ai-custom-dont">
+          <div class="ai-card-label" style="color:var(--accent)">맞춤 DON'T ✦</div>
+          <p class="ai-card-text" id="ai-custom-dont"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI 로딩 상태 -->
+    <div class="ai-loading" id="ai-loading">
+      <div class="ai-loading-inner">
+        <span class="ai-loading-dot"></span>
+        <span class="ai-loading-dot"></span>
+        <span class="ai-loading-dot"></span>
+        <span class="ai-loading-label">AI 심층 분석 중</span>
+      </div>
+    </div>
+
+<div class="stress-section">
+      <p class="section-label">Stress Response · 스트레스 반응</p>
+      <p class="section-title">에너지 임계점</p>
+      <div class="stress-bar-wrap">
+        <div class="stress-bar-label">
+          <span>현재 적응 지수</span><span>68 / 100</span>
+        </div>
+        <div class="stress-track">
+          <div class="stress-fill" style="width:68%"></div>
+        </div>
+        <p class="stress-text">
+          극한의 스트레스 상황에서 ENFP는 평소와 달리 내향적으로 수축되며 강박적 세부 집착이 나타납니다. <strong style="color:var(--gold)">'새로움'이라는 산소</strong>를 주기적으로 공급하고, 감당 가능한 자극의 총량을 의식적으로 조절하세요.
+        </p>
+      </div>
+    </div>
+
+    <div class="result-cta">
+      <button class="btn-share" onclick="share()">결과 공유하기</button>
+      <button class="btn-retry" onclick="retry()">처음부터 다시하기</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+
+const MBTI_TYPES = {
+
+  // ══════════════════════════════════════════════
+  // ANALYST GROUP (NT)
+  // ══════════════════════════════════════════════
+
+  INTJ: {
+    type: "INTJ",
+    nickname: "전략적 설계자",
+    subtitle: "냉철한 통찰로 미래를 조각하는\n침묵의 건축가",
+    energy: { label: "E", pct: 22, label2: "I", pct2: 78 },
+    perception: { label: "S", pct: 28, label2: "N", pct2: 72 },
+    decision: { label: "T", pct: 78, label2: "F", pct2: 22 },
+    lifestyle: { label: "J", pct: 85, label2: "P", pct2: 15 },
+    metaphors: {
+      energy:     { icon: "🔋", name: "Nuclear Reactor",    desc: "혼자만의 깊은 사색에서 강력한 에너지를 생성합니다. 사람들의 소음은 출력을 낭비하는 간섭파입니다." },
+      perception: { icon: "🏗️", name: "Blueprint",         desc: "현실의 파편에서 전체 구조를 설계합니다. 디테일보다 시스템의 논리적 완결성이 먼저 보입니다." },
+      decision:   { icon: "⚖️", name: "Precision Scale",   desc: "감정은 변수, 논리는 상수입니다. 최적의 결론을 위해 감정적 노이즈를 철저히 필터링합니다." },
+      lifestyle:  { icon: "🗓️", name: "Master Plan",       desc: "모든 행동은 장기 전략의 일부입니다. 즉흥은 비효율이며, 계획은 통제의 언어입니다." }
+    },
+    do: ["장기 목표를 역산한 실행 로드맵 작성", "독립적 연구 시간 의식적으로 확보", "핵심 인사이트를 글로 정제하는 습관"],
+    dont: ["완벽주의로 인한 실행 지연", "타인의 감정적 필요 무시", "과도한 자기 비판 루프"],
+    stress: { index: 82, desc: "임계점에서 INTJ는 냉소적 완벽주의로 붕괴됩니다. 통제할 수 없는 변수에 집착하며 고립됩니다. <strong style='color:var(--gold)'>구조화된 고독</strong> — 방해 없는 사유 공간이 유일한 회복 경로입니다." }
+  },
+
+  INTP: {
+    type: "INTP",
+    nickname: "논리적 탐구자",
+    subtitle: "개념의 미로를 즐기며 헤매는\n순수한 지식의 건축가",
+    energy: { label: "E", pct: 20, label2: "I", pct2: 80 },
+    perception: { label: "S", pct: 25, label2: "N", pct2: 75 },
+    decision: { label: "T", pct: 80, label2: "F", pct2: 20 },
+    lifestyle: { label: "J", pct: 30, label2: "P", pct2: 70 },
+    metaphors: {
+      energy:     { icon: "🌌", name: "Black Hole",         desc: "내면의 사유 공간이 모든 에너지를 흡수합니다. 사람보다 개념과의 대화에서 충전됩니다." },
+      perception: { icon: "🔬", name: "Electron Microscope",desc: "현상의 표면이 아닌 작동 원리를 분해합니다. 왜(Why)가 무엇(What)보다 항상 먼저입니다." },
+      decision:   { icon: "🧮", name: "Logic Engine",       desc: "모든 주장은 검증받아야 합니다. 권위보다 논리적 일관성이 유일한 판단 기준입니다." },
+      lifestyle:  { icon: "🌀", name: "Infinite Loop",      desc: "최적의 시스템을 찾는 탐색은 끝나지 않습니다. 완성보다 탐구 자체가 목적입니다." }
+    },
+    do: ["아이디어를 프로토타입으로 구현하는 연습", "사고를 글이나 도식으로 외부화", "완성 기준을 낮춰 실제로 마감하기"],
+    dont: ["분석 마비(Analysis Paralysis)", "실용적 감각 완전 무시", "대화에서 상대의 감정 신호 놓치기"],
+    stress: { index: 70, desc: "극한 스트레스에서 INTP는 감정적으로 폭발하거나 완전히 철수합니다. <strong style='color:var(--gold)'>지적 몰입의 통로</strong> — 새로운 복잡한 문제가 최고의 리셋 버튼입니다." }
+  },
+
+  ENTJ: {
+    type: "ENTJ",
+    nickname: "대담한 통솔자",
+    subtitle: "비전을 현실로 강제하는\n지칠 줄 모르는 사령관",
+    energy: { label: "E", pct: 80, label2: "I", pct2: 20 },
+    perception: { label: "S", pct: 30, label2: "N", pct2: 70 },
+    decision: { label: "T", pct: 82, label2: "F", pct2: 18 },
+    lifestyle: { label: "J", pct: 88, label2: "P", pct2: 12 },
+    metaphors: {
+      energy:     { icon: "⚡", name: "Power Grid",         desc: "사람들을 이끌고 목표를 달성할 때 전력이 최대치로 충전됩니다. 비효율적인 환경이 전력 낭비의 원인입니다." },
+      perception: { icon: "🗺️", name: "Strategic Map",     desc: "현재 상황을 거시적 전장으로 바라봅니다. 모든 정보는 전략적 위치 계산에 사용됩니다." },
+      decision:   { icon: "⚙️", name: "Decision Engine",   desc: "최단 경로로 최적의 결과를 도출합니다. 감정은 결정 속도를 저하시키는 마찰력입니다." },
+      lifestyle:  { icon: "🏛️", name: "Command Center",    desc: "시스템이 없는 곳에 시스템을 만듭니다. 모든 혼돈은 정복될 질서의 전 단계입니다." }
+    },
+    do: ["팀원의 강점을 전략적으로 배치", "단기 성과보다 지속가능한 구조 설계", "정기적인 취약성 공개 연습"],
+    dont: ["타인의 실행 속도 강요", "감정적 필요 완전 무시", "독단적 의사결정"],
+    stress: { index: 75, desc: "극한 상황에서 ENTJ는 독재적 통제로 전환하며 주변을 소진시킵니다. <strong style='color:var(--gold)'>명확한 승리 조건 재설정</strong> — 작은 통제 가능한 목표가 압박을 해제합니다." }
+  },
+
+  ENTP: {
+    type: "ENTP",
+    nickname: "뜨거운 논쟁가",
+    subtitle: "가능성의 경계를 시험하는\n아이디어의 폭죽",
+    energy: { label: "E", pct: 75, label2: "I", pct2: 25 },
+    perception: { label: "S", pct: 22, label2: "N", pct2: 78 },
+    decision: { label: "T", pct: 68, label2: "F", pct2: 32 },
+    lifestyle: { label: "J", pct: 25, label2: "P", pct2: 75 },
+    metaphors: {
+      energy:     { icon: "🎆", name: "Spark Generator",   desc: "아이디어 충돌에서 불꽃이 튑니다. 지적 자극이 없는 환경은 발전기 없는 회로입니다." },
+      perception: { icon: "🌐", name: "Web of Ideas",      desc: "모든 개념은 다른 개념과 연결됩니다. 연결고리를 발견하는 순간이 최고의 쾌감입니다." },
+      decision:   { icon: "🎭", name: "Devil's Advocate",  desc: "어떤 입장도 반박할 수 있습니다. 논쟁은 진실을 추출하는 가장 효율적인 방법입니다." },
+      lifestyle:  { icon: "🎲", name: "Chaos Engine",      desc: "루틴은 창의성의 적입니다. 예측 불가능한 환경에서 최고의 아이디어가 탄생합니다." }
+    },
+    do: ["아이디어를 실행 단계로 분해하는 파트너 확보", "한 프로젝트를 끝까지 완수하는 훈련", "논쟁과 공격을 구분하는 감수성 개발"],
+    dont: ["반박을 위한 반박", "시작만 하고 마무리 없음", "세부 실행을 타인에게 전적으로 위임"],
+    stress: { index: 65, desc: "스트레스 상황에서 ENTP는 강박적 논리 순환에 빠지거나 과대한 계획으로 도피합니다. <strong style='color:var(--gold)'>새로운 지적 자극</strong> — 전혀 다른 분야의 문제가 리셋을 제공합니다." }
+  },
+
+  // ══════════════════════════════════════════════
+  // DIPLOMAT GROUP (NF)
+  // ══════════════════════════════════════════════
+
+  INFJ: {
+    type: "INFJ",
+    nickname: "선의의 옹호자",
+    subtitle: "인류의 가능성을 믿으며\n조용히 세상을 바꾸는 예언자",
+    energy: { label: "E", pct: 25, label2: "I", pct2: 75 },
+    perception: { label: "S", pct: 20, label2: "N", pct2: 80 },
+    decision: { label: "T", pct: 35, label2: "F", pct2: 65 },
+    lifestyle: { label: "J", pct: 75, label2: "P", pct2: 25 },
+    metaphors: {
+      energy:     { icon: "🕯️", name: "Slow Burn Candle",  desc: "깊고 의미있는 연결에서 천천히 타오릅니다. 피상적인 관계는 촛불을 꺼트리는 바람입니다." },
+      perception: { icon: "🔮", name: "Crystal Ball",       desc: "현재 패턴에서 미래를 읽습니다. 타인이 보지 못하는 흐름을 직관적으로 감지합니다." },
+      decision:   { icon: "🧭", name: "Moral Compass",      desc: "내면의 가치 체계가 나침반입니다. 옳고 그름에 대한 강력한 내적 기준이 모든 판단의 기준입니다." },
+      lifestyle:  { icon: "📜", name: "Life Blueprint",     desc: "삶에는 의미와 방향이 있어야 합니다. 무질서한 환경은 내면의 비전을 흐립니다." }
+    },
+    do: ["명확한 개인 경계(Boundary) 설정", "직관적 통찰을 글로 기록하는 습관", "완벽한 도움 대신 가능한 도움 실천"],
+    dont: ["과도한 감정 이입으로 자기 소진", "비현실적인 이상에 집착", "갈등을 피하기 위한 자기 억압"],
+    stress: { index: 78, desc: "INFJ는 스트레스 하에서 완전히 철수하거나 갑작스럽게 폭발합니다('INFJ 도어슬램'). <strong style='color:var(--gold)'>독립적인 창작 활동</strong> — 글, 그림 등 내면을 표현하는 채널이 압력을 해소합니다." }
+  },
+
+  INFP: {
+    type: "INFP",
+    nickname: "열정적인 중재자",
+    subtitle: "내면의 이상을 현실에 수놓는\n조용한 꿈의 직조자",
+    energy: { label: "E", pct: 25, label2: "I", pct2: 75 },
+    perception: { label: "S", pct: 22, label2: "N", pct2: 78 },
+    decision: { label: "T", pct: 25, label2: "F", pct2: 75 },
+    lifestyle: { label: "J", pct: 28, label2: "P", pct2: 72 },
+    metaphors: {
+      energy:     { icon: "🌙", name: "Moonlight",          desc: "고요한 내면 세계에서 은은하게 충전됩니다. 과도한 외부 자극은 달빛을 가리는 구름입니다." },
+      perception: { icon: "🎨", name: "Watercolor Lens",    desc: "세상을 감정의 색채로 해석합니다. 팩트보다 그 안에 담긴 의미와 감정이 먼저 보입니다." },
+      decision:   { icon: "💎", name: "Value Crystal",      desc: "내면의 가치와 공명하는 선택을 합니다. 외부 기준이 아닌 진정성이 유일한 나침반입니다." },
+      lifestyle:  { icon: "🍃", name: "Wind Leaf",          desc: "영감이 이끄는 곳으로 흘러갑니다. 경직된 구조보다 유기적인 흐름에서 꽃을 피웁니다." }
+    },
+    do: ["가치에 기반한 작은 행동 즉시 실천", "감정 일기로 내면 상태 모니터링", "창작 활동을 통한 정기적 자기 표현"],
+    dont: ["이상과 현실의 괴리로 인한 무기력", "타인을 기쁘게 하기 위한 자기 부정", "내면 갈등을 혼자 감당하려는 고집"],
+    stress: { index: 60, desc: "스트레스 하에서 INFP는 강렬한 자기 비판과 감정적 마비 상태에 빠집니다. <strong style='color:var(--gold)'>의미있는 창작 공간</strong> — 판단 없는 표현의 출구가 회복의 열쇠입니다." }
+  },
+
+  ENFJ: {
+    type: "ENFJ",
+    nickname: "정의로운 사회자",
+    subtitle: "사람들의 잠재력을 깨우는\n따뜻한 카리스마의 지휘자",
+    energy: { label: "E", pct: 78, label2: "I", pct2: 22 },
+    perception: { label: "S", pct: 30, label2: "N", pct2: 70 },
+    decision: { label: "T", pct: 28, label2: "F", pct2: 72 },
+    lifestyle: { label: "J", pct: 72, label2: "P", pct2: 28 },
+    metaphors: {
+      energy:     { icon: "☀️", name: "Sun",                desc: "사람들과 연결되고 성장을 이끌 때 빛이 최대로 발산됩니다. 홀로 있는 시간이 길면 온도가 낮아집니다." },
+      perception: { icon: "🌱", name: "Growth Sensor",      desc: "사람의 가능성과 성장 경로가 먼저 보입니다. 현재 상태보다 앞으로 될 모습이 선명합니다." },
+      decision:   { icon: "🤝", name: "Harmony Bridge",     desc: "관계의 조화가 최우선 가치입니다. 갈등 해결의 열쇠는 항상 사람 사이 연결에 있습니다." },
+      lifestyle:  { icon: "📋", name: "Care Schedule",      desc: "사람들을 돌보는 일도 체계가 필요합니다. 따뜻함과 구조가 공존하는 삶을 추구합니다." }
+    },
+    do: ["자신의 필요를 타인만큼 소중히 여기기", "정기적인 단독 충전 시간 확보", "칭찬과 승인 없이도 행동하는 연습"],
+    dont: ["타인의 문제를 자신의 책임으로 내면화", "승인 욕구로 인한 진심 억제", "번아웃까지 돌봄 지속"],
+    stress: { index: 72, desc: "극한 상황에서 ENFJ는 과도한 통제 시도와 자기 희생으로 번아웃됩니다. <strong style='color:var(--gold)'>무조건적 휴식 공간</strong> — 돌봄의 의무에서 벗어난 시간이 반드시 필요합니다." }
+  },
+
+  ENFP: {
+    type: "ENFP",
+    nickname: "무지개색 탐험가",
+    subtitle: "가능성의 지평선을 끊임없이 넓혀가는\n열정적인 연결의 건축가",
+    energy: { label: "E", pct: 72, label2: "I", pct2: 28 },
+    perception: { label: "S", pct: 30, label2: "N", pct2: 70 },
+    decision: { label: "T", pct: 35, label2: "F", pct2: 65 },
+    lifestyle: { label: "J", pct: 28, label2: "P", pct2: 72 },
+    metaphors: {
+      energy:     { icon: "☀️", name: "Solar Panel",        desc: "사람들과 아이디어를 나눌 때 에너지가 풀(Full)로 충전됩니다. 혼자 있는 시간이 길어지면 배터리가 서서히 방전됩니다." },
+      perception: { icon: "🔭", name: "Telescope",          desc: "현재의 사실보다 미래의 가능성과 비유에 심장이 뜁니다. 눈앞의 데이터보다 수평선 너머의 패턴을 먼저 감지합니다." },
+      decision:   { icon: "📡", name: "Empathy Radar",      desc: "타인의 감정 변화를 누구보다 빠르게 감지하고 공명합니다. 논리보다 관계의 온도가 결정의 기준이 됩니다." },
+      lifestyle:  { icon: "🗺️", name: "Adventure Log",     desc: "계획된 일정보다 예기치 못한 우연한 풍경에서 행복을 느낍니다. 삶은 완성된 지도가 아닌 실시간으로 그려지는 항해도입니다." }
+    },
+    do: ["영감 노트 즉시 기록", "다양한 분야 연결 시도", "감정 경계 설정 연습"],
+    dont: ["과도한 타인 승인 욕구", "동시 다발적 프로젝트 남발", "갈등 회피를 위한 침묵"],
+    stress: { index: 68, desc: "극한의 스트레스 상황에서 ENFP는 평소와 달리 내향적으로 수축되며 강박적 세부 집착이 나타납니다. <strong style='color:var(--gold)'>새로움이라는 산소</strong>를 주기적으로 공급하고, 감당 가능한 자극의 총량을 의식적으로 조절하세요." }
+  },
+
+  // ══════════════════════════════════════════════
+  // SENTINEL GROUP (SJ)
+  // ══════════════════════════════════════════════
+
+  ISTJ: {
+    type: "ISTJ",
+    nickname: "청렴한 관리자",
+    subtitle: "신뢰와 책임으로 세상의 기둥이 되는\n묵묵한 완수자",
+    energy: { label: "E", pct: 22, label2: "I", pct2: 78 },
+    perception: { label: "S", pct: 80, label2: "N", pct2: 20 },
+    decision: { label: "T", pct: 75, label2: "F", pct2: 25 },
+    lifestyle: { label: "J", pct: 88, label2: "P", pct2: 12 },
+    metaphors: {
+      energy:     { icon: "🏛️", name: "Granite Foundation", desc: "고요한 환경에서 흔들리지 않는 안정을 얻습니다. 예측 가능한 루틴이 최고의 에너지원입니다." },
+      perception: { icon: "📊", name: "Data Ledger",        desc: "검증된 사실과 과거의 데이터를 신뢰합니다. 구체적 증거 없이는 판단을 유보합니다." },
+      decision:   { icon: "⚖️", name: "Standard Protocol", desc: "원칙과 기준이 판단의 근거입니다. 감정이 아닌 검증된 절차가 올바른 결과를 보장합니다." },
+      lifestyle:  { icon: "🗂️", name: "Filing System",     desc: "모든 것은 제자리에 있어야 합니다. 체계적인 분류와 관리가 삶의 효율을 극대화합니다." }
+    },
+    do: ["유연성 근육을 의식적으로 단련", "감정적 필요를 언어로 표현하는 연습", "새로운 방법에 한 번씩 도전하기"],
+    dont: ["변화에 대한 반사적 저항", "과거 방식만을 고집하는 완고함", "타인의 감정적 필요 무시"],
+    stress: { index: 80, desc: "극한 상황에서 ISTJ는 통제 불가능한 상황에 분노하거나 완전히 무너집니다. <strong style='color:var(--gold)'>루틴의 회복</strong> — 작고 확실한 일상의 순서를 되찾는 것이 가장 빠른 회복법입니다." }
+  },
+
+  ISFJ: {
+    type: "ISFJ",
+    nickname: "용감한 수호자",
+    subtitle: "사랑하는 이들을 위해 조용히 헌신하는\n따뜻한 보호의 방패",
+    energy: { label: "E", pct: 28, label2: "I", pct2: 72 },
+    perception: { label: "S", pct: 78, label2: "N", pct2: 22 },
+    decision: { label: "T", pct: 28, label2: "F", pct2: 72 },
+    lifestyle: { label: "J", pct: 80, label2: "P", pct2: 20 },
+    metaphors: {
+      energy:     { icon: "🏡", name: "Hearth Fire",        desc: "소중한 사람들과의 깊은 연결에서 온기를 얻습니다. 낯선 환경의 긴 노출은 온도를 낮춥니다." },
+      perception: { icon: "📷", name: "Memory Album",       desc: "소중한 순간의 디테일을 사진처럼 저장합니다. 감각적이고 구체적인 기억이 삶의 나침반입니다." },
+      decision:   { icon: "💝", name: "Care Compass",       desc: "사랑하는 사람들에게 미치는 영향이 결정의 기준입니다. 따뜻함과 배려가 최우선 가치입니다." },
+      lifestyle:  { icon: "🌿", name: "Steady Routine",     desc: "예측 가능한 일상이 안전의 언어입니다. 안정된 구조 안에서 최고의 돌봄을 발휘합니다." }
+    },
+    do: ["자신의 필요를 표현하는 용기", "감사와 인정을 요청하는 연습", "경계 설정을 사랑의 표현으로 재정의"],
+    dont: ["자기 희생의 만성화", "인정받지 못할 때 침묵하는 습관", "변화에 대한 과도한 불안"],
+    stress: { index: 65, desc: "스트레스 하에서 ISFJ는 극도로 예민해지거나 신체적 증상으로 표출됩니다. <strong style='color:var(--gold)'>안전한 회복 공간</strong> — 판단 없이 쉴 수 있는 익숙한 환경이 핵심 처방입니다." }
+  },
+
+  ESTJ: {
+    type: "ESTJ",
+    nickname: "엄격한 관리자",
+    subtitle: "질서와 책임으로 공동체를 이끄는\n신뢰받는 집행관",
+    energy: { label: "E", pct: 78, label2: "I", pct2: 22 },
+    perception: { label: "S", pct: 78, label2: "N", pct2: 22 },
+    decision: { label: "T", pct: 80, label2: "F", pct2: 20 },
+    lifestyle: { label: "J", pct: 88, label2: "P", pct2: 12 },
+    metaphors: {
+      energy:     { icon: "🏗️", name: "Construction Site", desc: "목표를 달성하고 시스템을 구축할 때 에너지가 최고조에 달합니다. 비효율과 무질서는 에너지 소진의 주범입니다." },
+      perception: { icon: "📋", name: "Operations Manual", desc: "검증된 절차와 현실적인 데이터를 기반으로 판단합니다. 추측이 아닌 사실이 유일한 작전 지도입니다." },
+      decision:   { icon: "🔨", name: "Gavel",             desc: "원칙과 규정이 명확한 기준입니다. 공정하고 일관된 판단이 신뢰를 만들고 조직을 유지합니다." },
+      lifestyle:  { icon: "⏰", name: "Master Clock",      desc: "모든 것은 제때 제자리에서 이루어져야 합니다. 시간과 구조의 관리가 성공의 핵심 변수입니다." }
+    },
+    do: ["팀원 개개인의 동기를 이해하는 시간", "결과만큼 과정을 인정하는 피드백", "감정적 유연성을 강점으로 수용"],
+    dont: ["감정 표현을 비효율로 취급", "변화를 위협으로 반사적 차단", "과도한 통제로 팀 자율성 억압"],
+    stress: { index: 78, desc: "극한에서 ESTJ는 더 강압적인 통제를 시도하며 주변을 소외시킵니다. <strong style='color:var(--gold)'>물리적 실행</strong> — 손에 잡히는 명확한 문제 해결이 최고의 감압 밸브입니다." }
+  },
+
+  ESFJ: {
+    type: "ESFJ",
+    nickname: "사교적인 외교관",
+    subtitle: "공동체의 온도를 높이는\n관계의 촉진자",
+    energy: { label: "E", pct: 80, label2: "I", pct2: 20 },
+    perception: { label: "S", pct: 75, label2: "N", pct2: 25 },
+    decision: { label: "T", pct: 25, label2: "F", pct2: 75 },
+    lifestyle: { label: "J", pct: 78, label2: "P", pct2: 22 },
+    metaphors: {
+      energy:     { icon: "🎉", name: "Festival Light",     desc: "사람들과 함께하고 조화를 만들 때 빛이 가장 밝게 빛납니다. 갈등과 불화는 에너지를 급격히 소진합니다." },
+      perception: { icon: "🌡️", name: "Social Thermometer",desc: "관계의 온도를 정밀하게 감지합니다. 사람들의 필요와 감정 변화가 가장 중요한 현실 데이터입니다." },
+      decision:   { icon: "🌸", name: "Harmony Bloom",      desc: "모두가 행복한 결과를 추구합니다. 관계의 균형이 깨지지 않는 선에서 최선을 결정합니다." },
+      lifestyle:  { icon: "📅", name: "Social Calendar",    desc: "사람과 행사가 있는 충실한 일정이 삶의 활력입니다. 구조화된 돌봄이 최고의 기쁨입니다." }
+    },
+    do: ["자신의 감정을 먼저 확인하는 습관", "비판을 성장의 정보로 재프레이밍", "모든 갈등을 해결하려는 충동에 제동"],
+    dont: ["타인의 평가에 자존감 전체 의존", "불편한 진실을 관계를 위해 숨기기", "자기 필요를 항상 뒤로 미루기"],
+    stress: { index: 70, desc: "스트레스 하에서 ESFJ는 과도한 걱정과 타인 탓으로 감정이 폭발합니다. <strong style='color:var(--gold)'>소수의 깊은 연결</strong> — 신뢰하는 한 명에게 솔직하게 말하는 것이 가장 빠른 회복입니다." }
+  },
+
+  // ══════════════════════════════════════════════
+  // EXPLORER GROUP (SP)
+  // ══════════════════════════════════════════════
+
+  ISTP: {
+    type: "ISTP",
+    nickname: "만능 재주꾼",
+    subtitle: "원리를 꿰뚫고 즉각 행동하는\n냉철한 문제 해결사",
+    energy: { label: "E", pct: 22, label2: "I", pct2: 78 },
+    perception: { label: "S", pct: 72, label2: "N", pct2: 28 },
+    decision: { label: "T", pct: 78, label2: "F", pct2: 22 },
+    lifestyle: { label: "J", pct: 25, label2: "P", pct2: 75 },
+    metaphors: {
+      energy:     { icon: "🔧", name: "Toolbox",            desc: "혼자서 무언가를 분해하고 조립할 때 에너지가 충전됩니다. 의미없는 사교는 도구를 소모하는 마찰입니다." },
+      perception: { icon: "🔩", name: "Mechanism Scanner",  desc: "어떻게 작동하는가를 본능적으로 감지합니다. 이론보다 실제 메커니즘이 가장 흥미로운 현실입니다." },
+      decision:   { icon: "🎯", name: "Precision Strike",   desc: "가장 효율적인 해결책을 즉각 선택합니다. 감정은 결정 속도를 늦추는 불필요한 변수입니다." },
+      lifestyle:  { icon: "⚡", name: "On-demand Engine",   desc: "필요할 때 즉각 가동됩니다. 미리 계획하기보다 현장에서 최적 경로를 찾는 것이 자연스럽습니다." }
+    },
+    do: ["감정 어휘를 늘려 표현력 확장", "장기 목표를 시각화하는 연습", "팀워크에서 소통 빈도 의식적으로 높이기"],
+    dont: ["감정적 의사소통 완전 회피", "위험을 자극으로만 소비하는 패턴", "책임 회피로 오해받는 과묵함"],
+    stress: { index: 62, desc: "스트레스에서 ISTP는 완전한 철수 또는 무모한 위험 감수로 이분됩니다. <strong style='color:var(--gold)'>물리적 몰입 활동</strong> — 손을 사용하는 구체적 작업이 정신을 리셋합니다." }
+  },
+
+  ISFP: {
+    type: "ISFP",
+    nickname: "호기심 많은 예술가",
+    subtitle: "순간의 아름다움을 포착하는\n자유로운 감각의 시인",
+    energy: { label: "E", pct: 28, label2: "I", pct2: 72 },
+    perception: { label: "S", pct: 70, label2: "N", pct2: 30 },
+    decision: { label: "T", pct: 25, label2: "F", pct2: 75 },
+    lifestyle: { label: "J", pct: 22, label2: "P", pct2: 78 },
+    metaphors: {
+      energy:     { icon: "🌺", name: "Wildflower",         desc: "자유롭고 조용한 공간에서 자연스럽게 피어납니다. 강요된 환경에서는 꽃잎이 오므라듭니다." },
+      perception: { icon: "🎨", name: "Sensory Palette",    desc: "색, 소리, 질감의 섬세한 조화를 감지합니다. 아름다움은 추상이 아닌 구체적 감각 속에 있습니다." },
+      decision:   { icon: "💫", name: "Authentic Spark",    desc: "내면의 진정성이 모든 선택의 기준입니다. 자신의 가치와 어긋나는 결정은 신체적 불편함으로 신호됩니다." },
+      lifestyle:  { icon: "🍂", name: "Seasonal Flow",      desc: "지금 이 순간에 최대한 존재합니다. 먼 미래의 계획보다 오늘의 아름다움이 더 실재합니다." }
+    },
+    do: ["작품이나 표현을 통한 정기적 감정 해소", "가치 기반의 장기 방향성 설정", "자신의 강점을 언어로 표현하는 연습"],
+    dont: ["감정을 지나치게 내면화하는 고립", "비판에 대한 과도한 상처", "현재 쾌락에 치우친 미래 회피"],
+    stress: { index: 58, desc: "스트레스에서 ISFP는 극단적으로 예민해지거나 자기 파괴적 행동을 보입니다. <strong style='color:var(--gold)'>자연과 감각의 회복</strong> — 아름다운 환경 속 단독 시간이 가장 빠른 치유입니다." }
+  },
+
+  ESTP: {
+    type: "ESTP",
+    nickname: "모험을 즐기는 사업가",
+    subtitle: "현장에서 기회를 낚아채는\n에너지 넘치는 행동가",
+    energy: { label: "E", pct: 82, label2: "I", pct2: 18 },
+    perception: { label: "S", pct: 78, label2: "N", pct2: 22 },
+    decision: { label: "T", pct: 70, label2: "F", pct2: 30 },
+    lifestyle: { label: "J", pct: 20, label2: "P", pct2: 80 },
+    metaphors: {
+      energy:     { icon: "🏎️", name: "Racing Engine",     desc: "행동과 자극이 있는 환경에서 엔진이 풀 가동됩니다. 정적인 환경은 엔진을 멈추게 합니다." },
+      perception: { icon: "📸", name: "Instant Camera",    desc: "현재 순간의 디테일을 즉각 포착합니다. 추상적 개념보다 눈앞의 현실이 가장 중요한 데이터입니다." },
+      decision:   { icon: "⚡", name: "Rapid Fire",        desc: "즉각적인 판단과 실행이 최고의 전략입니다. 계산보다 현장 감각이 더 정확한 나침반입니다." },
+      lifestyle:  { icon: "🎲", name: "Live Wire",         desc: "예측 불가능한 상황에서 가장 빛납니다. 틀에 박힌 루틴은 창의적 에너지를 차단합니다." }
+    },
+    do: ["충동적 결정 전 3분 숙려 훈련", "장기적 결과를 시각화하는 습관", "감정 표현을 약점이 아닌 강점으로 수용"],
+    dont: ["위험의 결과를 과소평가하는 과신", "지루함을 무조건 자극으로 해결", "타인의 감정적 필요를 가볍게 처리"],
+    stress: { index: 60, desc: "스트레스에서 ESTP는 더 큰 자극을 찾거나 충동적 결정을 남발합니다. <strong style='color:var(--gold)'>즉각적인 신체 활동</strong> — 스포츠나 물리적 도전이 압력을 건강하게 해소합니다." }
+  },
+
+  ESFP: {
+    type: "ESFP",
+    nickname: "자유로운 연예인",
+    subtitle: "삶을 무대로 만드는\n넘치는 활력의 퍼포머",
+    energy: { label: "E", pct: 85, label2: "I", pct2: 15 },
+    perception: { label: "S", pct: 75, label2: "N", pct2: 25 },
+    decision: { label: "T", pct: 22, label2: "F", pct2: 78 },
+    lifestyle: { label: "J", pct: 18, label2: "P", pct2: 82 },
+    metaphors: {
+      energy:     { icon: "🎪", name: "Stage Spotlight",   desc: "사람들과 함께하고 즐거움을 만들 때 스포트라이트가 켜집니다. 고독과 침묵은 배터리를 급속 방전합니다." },
+      perception: { icon: "🌈", name: "Vivid Filter",      desc: "세상을 생생하고 풍부한 색채로 경험합니다. 지금 이 순간의 풍요로움이 가장 실재하는 현실입니다." },
+      decision:   { icon: "🎵", name: "Feel the Beat",     desc: "마음이 움직이는 방향으로 결정합니다. 사람들의 행복과 현재 순간의 기쁨이 최고의 기준입니다." },
+      lifestyle:  { icon: "🎊", name: "Perpetual Party",   desc: "매 순간이 축제가 될 수 있습니다. 엄격한 계획보다 자연스럽게 흘러가는 삶에서 최고의 기억이 만들어집니다." }
+    },
+    do: ["감정의 파도를 관찰하고 이름 붙이기", "장기 목표를 작고 즐거운 단계로 분해", "비판을 선물로 받아들이는 연습"],
+    dont: ["불편한 감정을 자극으로 회피", "책임을 즐거움의 반대말로 인식", "미래 계획 전면 거부"],
+    stress: { index: 55, desc: "스트레스에서 ESFP는 과도한 자극 추구로 상황을 악화시킵니다. <strong style='color:var(--gold)'>신뢰하는 사람과의 솔직한 대화</strong> — 말하는 것 자체가 치유의 과정입니다." }
+  }
+};
+
+// export for use in main app
+if (typeof module !== 'undefined') module.exports = MBTI_TYPES;
+
+
+const questions = [
+  { indicator:'E/I', badge:'E / I', context:'SITUATION · 에너지 충전 방식', text:'계획 없는 휴일이 생겼을 때, 당신이 가장 먼저 하는 것은?', a:'누구라도 불러서 밖으로 나간다', b:'밀린 잠을 자거나 혼자 시간을 보낸다', score:['E','I'] },
+  { indicator:'E/I', badge:'E / I', context:'SITUATION · 의사소통 방식', text:'회의 중 의견이 생겼을 때 당신은?', a:'말을 하면서 생각을 정리한다', b:'생각을 모두 마친 후에 입을 연다', score:['E','I'] },
+  { indicator:'E/I', badge:'E / I', context:'SITUATION · 사교 후 에너지', text:'오랜 모임이 끝난 후 당신의 상태는?', a:'에너지를 얻어 기분이 고조된다', b:'즐겁더라도 혼자만의 충전이 간절하다', score:['E','I'] },
+  { indicator:'E/I', badge:'E / I', context:'SITUATION · 대인 관계 범위', text:'당신이 선호하는 인간관계의 형태는?', a:'넓고 다양한 사람들과 연결되는 것', b:'소수의 사람과 깊이 밀접한 관계', score:['E','I'] },
+  { indicator:'E/I', badge:'E / I', context:'SITUATION · 낯선 환경', text:'낯선 사람에게 먼저 말을 거는 편인가요?', a:'거리낌 없이 먼저 말을 건다', b:'필요한 상황이 아니면 먼저 걸지 않는다', score:['E','I'] },
+  { indicator:'S/N', badge:'S / N', context:'SITUATION · 정보 인식 방식', text:'영화를 보고 나서 가장 먼저 떠오르는 것은?', a:'명장면과 줄거리를 상세히 묘사', b:'메시지, 비유, 상징적 의미를 회상', score:['S','N'] },
+  { indicator:'S/N', badge:'S / N', context:'SITUATION · 실행 방식', text:'요리를 할 때 당신의 방식은?', a:'레시피의 계량 수치를 정확히 준수', b:'감으로 재료를 넣으며 나만의 방식 시도', score:['S','N'] },
+  { indicator:'S/N', badge:'S / N', context:'SITUATION · 공간 기억', text:'처음 간 길을 기억할 때 주로 무엇을 기억하나요?', a:'랜드마크나 구체적인 건물명', b:'전체적인 방향감과 지도의 흐름', score:['S','N'] },
+  { indicator:'S/N', badge:'S / N', context:'SITUATION · 가상 상황', text:'\"만약에...\" 로 시작하는 질문을 들으면?', a:'일어날 리 없는 일을 왜 고민해?', b:'꼬리에 꼬리를 무는 상상을 펼친다', score:['S','N'] },
+  { indicator:'S/N', badge:'S / N', context:'SITUATION · 업무 지시', text:'업무를 지시받을 때 선호하는 방식은?', a:'당장 수행할 명확한 행동 지침', b:'업무 목적에 대한 전체적인 비전', score:['S','N'] },
+  { indicator:'T/F', badge:'T / F', context:'SITUATION · 감정 대응', text:'친구가 시험에 낙방했다는 소식을 들었을 때?', a:'무슨 과목이 어려웠어? 라고 묻는다', b:'고생 많았는데 속상하겠다 고 공감한다', score:['T','F'] },
+  { indicator:'T/F', badge:'T / F', context:'SITUATION · 논쟁 발생', text:'논쟁이 발생했을 때 당신의 첫 번째 반응은?', a:'감정을 배제하고 사실 관계부터 파악', b:'상대 기분을 상하게 하면서까지 말하지 않음', score:['T','F'] },
+  { indicator:'T/F', badge:'T / F', context:'SITUATION · 칭찬 선호', text:'어떤 칭찬을 들을 때 더 기분이 좋나요?', a:'효율적이고 깔끔한 처리네요', b:'팀 분위기에 큰 힘이 되었어요', score:['T','F'] },
+  { indicator:'T/F', badge:'T / F', context:'SITUATION · 규칙과 예외', text:'규칙 위반 상황을 목격했을 때 당신은?', a:'예외 없이 원칙대로 처리해야 한다', b:'그럴만한 사정이 있었는지 먼저 살핀다', score:['T','F'] },
+  { indicator:'T/F', badge:'T / F', context:'SITUATION · 비판적 피드백', text:'타인을 비판해야 할 때 당신의 방식은?', a:'솔직하게 말하는 것이 진정한 도움', b:'상처가 되지 않게 최대한 완곡히 표현', score:['T','F'] },
+  { indicator:'J/P', badge:'J / P', context:'SITUATION · 사전 준비', text:'여행 가방을 쌀 때 당신의 방식은?', a:'필요한 목록을 체크하며 미리 준비', b:'떠나기 직전에 눈에 보이는 대로 넣음', score:['J','P'] },
+  { indicator:'J/P', badge:'J / P', context:'SITUATION · 시간 관리', text:'약속 시간이 정해진 후 당신은?', a:'이동 경로와 수단까지 미리 계산', b:'변수가 생겨도 크게 당황하지 않는다', score:['J','P'] },
+  { indicator:'J/P', badge:'J / P', context:'SITUATION · 공간 정리', text:'책상이 어질러진 상태일 때 당신은?', a:'정리가 되어야 일이 손에 잡힌다', b:'필요한 것만 찾을 수 있으면 무관하다', score:['J','P'] },
+  { indicator:'J/P', badge:'J / P', context:'SITUATION · 즉흥 이벤트', text:'갑작스러운 번개 모임 제안을 받으면?', a:'일정의 불확실성에 내심 불편함을 느낀다', b:'새로운 이벤트에 즐겁게 응한다', score:['J','P'] },
+  { indicator:'J/P', badge:'J / P', context:'SITUATION · 마감 태도', text:'마감 기한 직전 업무를 처리할 때?', a:'미리 끝내놓고 여유를 부린다', b:'마감 직전의 긴박함에서 효율이 생긴다', score:['J','P'] }
+];
+
+let current = 0;
+let answers = [];
+let responseTimes = [];
+let questionStartTime = 0;
+let selectedChoice = null;
+let scores = { E:0, I:0, S:0, N:0, T:0, F:0, J:0, P:0 };
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function startQuiz() {
+  current = 0; answers = []; responseTimes = [];
+  scores = { E:0, I:0, S:0, N:0, T:0, F:0, J:0, P:0 };
+  show('question');
+  loadQuestion();
+}
+
+function loadQuestion() {
+  const q = questions[current];
+  selectedChoice = null;
+
+  document.getElementById('q-num').textContent = current + 1;
+  document.getElementById('progress-fill').style.width = ((current+1)/20*100) + '%';
+
+  const badge = document.getElementById('q-badge');
+  badge.textContent = q.badge;
+  badge.className = 'q-badge ' + q.score[0];
+
+  document.getElementById('q-text').textContent = q.text;
+  document.getElementById('q-context').textContent = q.context;
+  document.getElementById('choice-a').textContent = q.a;
+  document.getElementById('choice-b').textContent = q.b;
+
+  document.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('selected'));
+  const btn = document.getElementById('btn-next');
+  btn.classList.remove('visible');
+
+  questionStartTime = performance.now();
+}
+
+function selectChoice(idx) {
+  selectedChoice = idx;
+  const rt = Math.round(performance.now() - questionStartTime);
+  responseTimes.push(rt);
+
+  document.querySelectorAll('.choice-btn').forEach((b,i) => {
+    b.classList.toggle('selected', i === idx);
+  });
+  document.getElementById('btn-next').classList.add('visible');
+}
+
+function nextQuestion() {
+  if (selectedChoice === null) return;
+  const q = questions[current];
+  const scored = q.score[selectedChoice];
+  scores[scored]++;
+  answers.push({ q: current, choice: selectedChoice, rt: responseTimes[responseTimes.length-1] });
+
+  current++;
+  if (current < questions.length) {
+    loadQuestion();
+  } else {
+    showAnalysis();
+  }
+}
+
+function showAnalysis() {
+  show('analysis');
+  const steps = [0,1,2,3];
+  let i = 0;
+  function advance() {
+    if (i > 0) {
+      document.getElementById('step-'+(i-1)).classList.remove('active');
+      document.getElementById('step-'+(i-1)).classList.add('done');
+    }
+    if (i < steps.length) {
+      document.getElementById('step-'+i).classList.add('active');
+      i++;
+      setTimeout(advance, 900);
+    } else {
+      setTimeout(showResult, 600);
+    }
+  }
+  advance();
+}
+
+function showResult() {
+  const typeKey = [
+    scores.E >= scores.I ? 'E' : 'I',
+    scores.S >= scores.N ? 'S' : 'N',
+    scores.T >= scores.F ? 'T' : 'F',
+    scores.J >= scores.P ? 'J' : 'P'
+  ].join('');
+
+  const d = MBTI_TYPES[typeKey];
+  const pct = {
+    E: Math.round(scores.E/5*100), I: Math.round(scores.I/5*100),
+    S: Math.round(scores.S/5*100), N: Math.round(scores.N/5*100),
+    T: Math.round(scores.T/5*100), F: Math.round(scores.F/5*100),
+    J: Math.round(scores.J/5*100), P: Math.round(scores.P/5*100),
+  };
+
+  // Hero
+  document.getElementById('res-type').textContent = d.type;
+  document.getElementById('res-title').textContent = d.nickname;
+  document.getElementById('res-subtitle').innerHTML = d.subtitle.replace('\n','<br>');
+
+  // Bars
+  const pairs = [
+    [d.energy.label, d.energy.pct, d.energy.label2, d.energy.pct2],
+    [d.perception.label, d.perception.pct, d.perception.label2, d.perception.pct2],
+    [d.decision.label, d.decision.pct, d.decision.label2, d.decision.pct2],
+    [d.lifestyle.label, d.lifestyle.pct, d.lifestyle.label2, d.lifestyle.pct2],
+  ];
+  document.querySelectorAll('.bar-row').forEach((row, i) => {
+    const [la, pa, lb, pb] = pairs[i];
+    const fills = row.querySelectorAll('.bar-fill');
+    fills[0].style.width = pa + '%';
+    fills[1].style.width = pb + '%';
+    row.querySelector('.bar-pct').textContent = Math.max(pa, pb) + '%';
+    row.querySelectorAll('.bar-label')[0].textContent = la;
+    row.querySelector('.bar-label-r').textContent = lb;
+  });
+
+  // Metaphor sections
+  const metaOrder = ['energy','perception','decision','lifestyle'];
+  const metaLabels = ['Energy · 에너지','Perception · 인식','Decision · 판단','Lifestyle · 생활방식'];
+  const metaTitles = {
+    energy: '에너지 충전 방식', perception: '세상을 보는 눈',
+    decision: '마음의 기준', lifestyle: '삶의 방식'
+  };
+  const sections = document.querySelectorAll('.result-sections .section');
+  sections.forEach((sec, i) => {
+    const key = metaOrder[i];
+    const m = d.metaphors[key];
+    sec.querySelector('.section-label').textContent = metaLabels[i];
+    sec.querySelector('.section-title').textContent = m.name;
+    const card = sec.querySelector('.metaphor-card');
+    card.querySelector('.metaphor-icon').textContent = m.icon;
+    card.querySelector('.metaphor-name').textContent = m.name;
+    card.querySelector('.metaphor-desc').textContent = m.desc;
+  });
+
+  // Do & Don't
+  const doItems = document.querySelector('.do-card .card-items');
+  const dontItems = document.querySelector('.dont-card .card-items');
+  doItems.innerHTML = d.do.map(t => `<span class="card-item">${t}</span>`).join('');
+  dontItems.innerHTML = d.dont.map(t => `<span class="card-item">${t}</span>`).join('');
+
+  // Stress
+  document.querySelector('.stress-bar-label span:last-child').textContent = d.stress.index + ' / 100';
+  document.querySelector('.stress-fill').style.width = d.stress.index + '%';
+  document.querySelector('.stress-text').innerHTML = d.stress.desc;
+
+  show('result');
+  // Gemini AI 분석 비동기 호출
+  fetchGeminiAnalysis(typeKey, scores, answers, responseTimes);
+}
+
+async function fetchGeminiAnalysis(typeKey, scores, answers, responseTimes) {
+  const loadingEl = document.getElementById('ai-loading');
+  const sectionEl = document.getElementById('ai-insight-section');
+
+  try {
+    // API 엔드포인트: Vercel 배포 시 /api/analyze, 로컬 개발 시 변경
+    const API_URL = window.location.hostname === 'localhost'
+      ? 'http://localhost:3000/api/analyze'
+      : '/api/analyze';
+
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scores, answers, responseTimes, typeKey }),
+    });
+
+    const data = await res.json();
+
+    if (!data.success || data.fallback) {
+      // 폴백: AI 섹션 조용히 숨김, 기본 템플릿만 표시
+      loadingEl.style.display = 'none';
+      return;
+    }
+
+    const { analysis } = data;
+
+    // 인지적 부조화
+    document.getElementById('ai-indicator-tag').textContent = analysis.cognitive_dissonance.indicator;
+    const intensityEl = document.getElementById('ai-intensity');
+    intensityEl.textContent = analysis.cognitive_dissonance.intensity.toUpperCase();
+    intensityEl.className = 'ai-intensity ' + analysis.cognitive_dissonance.intensity;
+    document.getElementById('ai-dissonance-text').textContent = analysis.cognitive_dissonance.comment;
+
+    // 페르소나 갭
+    if (analysis.persona_gap.detected && analysis.persona_gap.comment) {
+      document.getElementById('ai-persona-text').textContent = analysis.persona_gap.comment;
+      document.getElementById('ai-persona').style.display = 'flex';
+    }
+
+    // 개인화 통찰
+    document.getElementById('ai-insight-text').textContent = analysis.personalized_insight;
+    document.getElementById('ai-custom-do').textContent = analysis.custom_do;
+    document.getElementById('ai-custom-dont').textContent = analysis.custom_dont;
+
+    // 로딩 숨기고 섹션 표시
+    loadingEl.style.display = 'none';
+    sectionEl.style.display = 'flex';
+
+  } catch (err) {
+    // 네트워크 오류 시 조용히 폴백
+    loadingEl.style.display = 'none';
+    console.warn('Gemini API unavailable, using template only:', err.message);
+  }
+}
+
+function share() {
+  if (navigator.share) {
+    navigator.share({ title: 'MBTI_CHAT-BOT', text: '나의 MBTI 분석 결과를 확인해보세요!', url: window.location.href });
+  } else {
+    navigator.clipboard.writeText(window.location.href).then(() => alert('링크가 복사되었습니다.'));
+  }
+}
+
+function retry() { show('intro'); }
+</script>
+</body>
+</html>
