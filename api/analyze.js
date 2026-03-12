@@ -1,60 +1,112 @@
-// api/generate-questions.js — Vercel Serverless Function
-// 사용자 프로필 기반 맞춤 질문 16개 생성 (Gemini 2.0 Flash)
+// api/analyze.js — Vercel Serverless Function
+// API 키는 Vercel 환경변수(GEMINI_API_KEY)에서만 읽음 → 브라우저 노출 없음
 
 export default async function handler(req, res) {
 
+  // CORS 헤더 설정
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
   try {
-    const { gender, age, job, hobbies } = req.body;
+    const { scores, answers, responseTimes, typeKey, userProfile } = req.body;
 
-    const safeGender = gender || '선택 안 함';
-    const safeAge   = age    || '선택 안 함';
-    const safeJob   = (job && job.trim()) ? job.trim() : '무직';
-    const safeHobbies = Array.isArray(hobbies) && hobbies.length > 0
-      ? hobbies.join(', ') : '없음';
-
-    const GEMINI_KEY = process.env.GEMINI_API_KEY;
-    if (!GEMINI_KEY) {
-      return res.status(200).json({ success: false, error: 'No API key' });
+    if (!scores || !typeKey) {
+      return res.status(400).json({ error: 'Invalid input' });
     }
 
-    const prompt = `당신은 MBTI 심리측정 전문가입니다. 아래 사용자 정보를 바탕으로 한국어 맞춤 질문 16개를 생성하십시오.
+    // ── 사용자 정보
+    const profile = userProfile || { gender: '선택 안 함', age: '선택 안 함', job: '무직', hobbies: [] };
+
+    // ── 응답 시간 통계 계산 (16문항: 지표당 4문항)
+    const indicatorMap = [
+      'EI','EI','EI','EI',
+      'SN','SN','SN','SN',
+      'TF','TF','TF','TF',
+      'JP','JP','JP','JP'
+    ];
+    const rtByIndicator = { EI: [], SN: [], TF: [], JP: [] };
+    responseTimes.forEach((rt, i) => {
+      if (indicatorMap[i]) rtByIndicator[indicatorMap[i]].push(rt);
+    });
+
+    const totalAvg = responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length;
+    const rtStats = {};
+    Object.entries(rtByIndicator).forEach(([key, rts]) => {
+      const avg = rts.reduce((a, b) => a + b, 0) / rts.length;
+      rtStats[key] = {
+        avg: Math.round(avg),
+        max: Math.max(...rts),
+        ratio: +(avg / totalAvg).toFixed(2),
+      };
+    });
+
+    // ── 중도 점수 감지 (16문항: 지표당 4문항)
+    const pct = {
+      E: Math.round(scores.E / 4 * 100), I: Math.round(scores.I / 4 * 100),
+      S: Math.round(scores.S / 4 * 100), N: Math.round(scores.N / 4 * 100),
+      T: Math.round(scores.T / 4 * 100), F: Math.round(scores.F / 4 * 100),
+      J: Math.round(scores.J / 4 * 100), P: Math.round(scores.P / 4 * 100),
+    };
+    const ambiguous = [];
+    [['E','I'],['S','N'],['T','F'],['J','P']].forEach(([a, b]) => {
+      const dominant = Math.max(pct[a], pct[b]);
+      if (dominant <= 65) ambiguous.push(`${a}/${b}(${dominant}%)`);
+    });
+
+    // ── Gemini 프롬프트
+    const prompt = `당신은 심리측정학 및 임상 상담 전문가입니다. MBTI Step II와 TCI 이론을 기반으로 아래 행동 데이터를 분석하십시오.
 
 [사용자 정보]
-성별: ${safeGender}
-연령대: ${safeAge}
-직업: ${safeJob}
-취미: ${safeHobbies}
+성별: ${profile.gender} | 연령대: ${profile.age} | 직업: ${profile.job} | 취미: ${(profile.hobbies||[]).join(', ')||'없음'}
 
-[규칙]
-1. MBTI 4대 지표(E/I, S/N, T/F, J/P)별 정확히 4문항씩, 총 16문항을 생성한다.
-2. 각 질문의 상황(context)은 반드시 위 직업 또는 취미와 관련된 실제 상황이어야 한다.
-3. 선택지 A와 B는 해당 지표의 양극단을 명확히 반영해야 하며, 어느 쪽도 옳고 그름이 없어야 한다.
-4. 한국 문화와 직장 환경을 기준으로 자연스러운 한국어로 작성한다.
-5. scoreA와 scoreB에는 반드시 E, I, S, N, T, F, J, P 중 하나를 입력한다.
-6. 반드시 아래 JSON 배열 형식으로만 응답하고, 다른 텍스트나 마크다운은 절대 포함하지 않는다.
+[기초 MBTI 점수]
+E:${scores.E}/I:${scores.I} | S:${scores.S}/N:${scores.N} | T:${scores.T}/F:${scores.F} | J:${scores.J}/P:${scores.P}
+도출 유형: ${typeKey}
+퍼센트: E${pct.E}% I${pct.I}% | S${pct.S}% N${pct.N}% | T${pct.T}% F${pct.F}% | J${pct.J}% P${pct.P}%
 
-[출력 형식]
-[
-  {
-    "indicator": "E/I",
-    "context": "SITUATION · 상황 한 줄 설명",
-    "text": "질문 내용",
-    "optionA": "선택지 A 내용",
-    "optionB": "선택지 B 내용",
-    "scoreA": "E",
-    "scoreB": "I"
-  }
-]
+[지표별 평균 응답시간 (ms)]
+E/I: ${rtStats.EI.avg}ms (전체평균 대비 ${rtStats.EI.ratio}배)
+S/N: ${rtStats.SN.avg}ms (전체평균 대비 ${rtStats.SN.ratio}배)
+T/F: ${rtStats.TF.avg}ms (전체평균 대비 ${rtStats.TF.ratio}배)
+J/P: ${rtStats.JP.avg}ms (전체평균 대비 ${rtStats.JP.ratio}배)
+전체 평균: ${Math.round(totalAvg)}ms
 
-지금 바로 JSON 배열만 출력하십시오.`;
+[중도적 점수 지표]
+${ambiguous.length > 0 ? ambiguous.join(', ') : '없음'}
 
+아래 JSON 형식으로만 응답하십시오. 다른 텍스트는 절대 포함하지 마십시오:
+{
+  "cognitive_dissonance": {
+    "indicator": "가장 응답 지연이 높은 지표명(예:T/F)",
+    "comment": "해당 지표의 심리적 갈등을 2문장으로 한국어 서술",
+    "intensity": "low또는medium또는high 중 하나"
+  },
+  "persona_gap": {
+    "detected": true또는false,
+    "comment": "기질과 사회적 페르소나 간 갭을 1~2문장으로 한국어 서술. 갭이 없으면 null"
+  },
+  "personalized_insight": "이 사람만의 고유한 심리 패턴을 2~3문장으로 한국어 서술",
+  "custom_do": "응답 데이터 기반 맞춤 실행 제언 1문장",
+  "custom_dont": "응답 데이터 기반 맞춤 경계 사항 1문장"
+}`;
+
+    // ── Gemini API 호출 (모델명 수정)
+    const GEMINI_KEY = process.env.GEMINI_API_KEY;
+
+    if (!GEMINI_KEY) {
+      return res.status(200).json({ success: false, fallback: true, error: 'No API key' });
+    }
+
+    // 최신 모델명으로 변경
     const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`;
 
     const geminiRes = await fetch(GEMINI_URL, {
@@ -63,8 +115,8 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.8,
-          maxOutputTokens: 2000,
+          temperature: 0.7,
+          maxOutputTokens: 600,
         },
       }),
     });
@@ -77,25 +129,14 @@ export default async function handler(req, res) {
     const geminiData = await geminiRes.json();
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
-    // JSON 파싱 (마크다운 펜스 제거)
+    // ── JSON 파싱
     const clean = rawText.replace(/```json|```/g, '').trim();
-    const questions = JSON.parse(clean);
+    const analysis = JSON.parse(clean);
 
-    // 유효성 검증: 16개 + 필수 필드 확인
-    if (!Array.isArray(questions) || questions.length < 16) {
-      throw new Error(`질문 수 부족: ${questions.length}개`);
-    }
-    const required = ['indicator','context','text','optionA','optionB','scoreA','scoreB'];
-    for (const q of questions) {
-      for (const field of required) {
-        if (!q[field]) throw new Error(`필드 누락: ${field}`);
-      }
-    }
-
-    return res.status(200).json({ success: true, questions: questions.slice(0, 16) });
+    return res.status(200).json({ success: true, analysis, typeKey });
 
   } catch (err) {
-    console.error('generate-questions error:', err);
-    return res.status(200).json({ success: false, error: err.message });
+    console.error('Analyze error:', err);
+    return res.status(200).json({ success: false, fallback: true, error: err.message });
   }
 }
