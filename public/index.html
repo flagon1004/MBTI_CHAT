@@ -1554,14 +1554,10 @@ async function startWithProfile() {
   userProfile.job = jobVal || '무직';
   userProfile.hobbies = selectedHobbies.length > 0 ? selectedHobbies : ['없음'];
 
-  // 생성 로딩 오버레이 표시
   document.getElementById('gen-loading').classList.add('active');
 
   try {
-    const API_URL = window.location.hostname === 'localhost'
-      ? 'http://localhost:3000/api/generate-questions'
-      : '/api/generate-questions';
-
+    const API_URL = '/api/generate-questions';
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1570,13 +1566,17 @@ async function startWithProfile() {
 
     const data = await res.json();
 
-    if (data.success && data.questions && data.questions.length >= 16) {
+    // API 응답 결과 콘솔 확인
+    console.log('AI 질문 생성 결과:', data);
+
+    if (data.success && Array.isArray(data.questions) && data.questions.length >= 16) {
       questions = data.questions;
     } else {
+      console.warn('AI 질문 생성 실패 사유:', data.error || '질문 수가 부족합니다.');
       questions = FALLBACK_QUESTIONS;
     }
   } catch (err) {
-    console.warn('질문 생성 실패, 기본 질문 사용:', err.message);
+    console.error('API 호출 중 네트워크/파싱 오류:', err);
     questions = FALLBACK_QUESTIONS;
   }
 
