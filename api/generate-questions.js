@@ -63,9 +63,10 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.8,
-          maxOutputTokens: 2000,
-        },
+        temperature: 0.8,
+        maxOutputTokens: 2000,
+        responseMimeType: "application/json",
+      },
       }),
     });
 
@@ -78,7 +79,7 @@ export default async function handler(req, res) {
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
     // JSON 파싱 (마크다운 펜스 제거)
-    const clean = rawText.replace(/```json|```/g, '').trim();
+    const clean = rawText.replace(/^```(?:json)?\s*|\s*```$/gi, '').trim();
     const questions = JSON.parse(clean);
 
     // 유효성 검증: 16개 + 필수 필드 확인
