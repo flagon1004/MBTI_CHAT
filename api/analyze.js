@@ -1,20 +1,12 @@
 // api/analyze.js — Vercel Serverless Function
-// API 키는 Vercel 환경변수(GEMINI_API_KEY)에서만 읽음 → 브라우저 노출 없음
 
 export default async function handler(req, res) {
-
-  // CORS 헤더 설정
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
     const { scores, answers, responseTimes, typeKey, userProfile } = req.body;
@@ -23,16 +15,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid input' });
     }
 
-    // ── 사용자 정보
     const profile = userProfile || { gender: '선택 안 함', age: '선택 안 함', job: '무직', hobbies: [] };
 
-    // ── 응답 시간 통계 계산 (16문항: 지표당 4문항)
-    const indicatorMap = [
-      'EI','EI','EI','EI',
-      'SN','SN','SN','SN',
-      'TF','TF','TF','TF',
-      'JP','JP','JP','JP'
-    ];
+    const indicatorMap = ['EI','EI','EI','EI','SN','SN','SN','SN','TF','TF','TF','TF','JP','JP','JP','JP'];
     const rtByIndicator = { EI: [], SN: [], TF: [], JP: [] };
     responseTimes.forEach((rt, i) => {
       if (indicatorMap[i]) rtByIndicator[indicatorMap[i]].push(rt);
@@ -49,7 +34,6 @@ export default async function handler(req, res) {
       };
     });
 
-    // ── 중도 점수 감지 (16문항: 지표당 4문항)
     const pct = {
       E: Math.round(scores.E / 4 * 100), I: Math.round(scores.I / 4 * 100),
       S: Math.round(scores.S / 4 * 100), N: Math.round(scores.N / 4 * 100),
@@ -62,7 +46,6 @@ export default async function handler(req, res) {
       if (dominant <= 65) ambiguous.push(`${a}/${b}(${dominant}%)`);
     });
 
-    // ── Gemini 프롬프트
     const prompt = `당신은 심리측정학 및 임상 상담 전문가입니다. MBTI Step II와 TCI 이론을 기반으로 아래 행동 데이터를 분석하십시오.
 
 [사용자 정보]
@@ -83,15 +66,15 @@ J/P: ${rtStats.JP.avg}ms (전체평균 대비 ${rtStats.JP.ratio}배)
 [중도적 점수 지표]
 ${ambiguous.length > 0 ? ambiguous.join(', ') : '없음'}
 
-아래 JSON 형식으로만 응답하십시오. 다른 텍스트는 절대 포함하지 마십시오:
+아래 JSON 형식으로만 응답하십시오:
 {
   "cognitive_dissonance": {
     "indicator": "가장 응답 지연이 높은 지표명(예:T/F)",
     "comment": "해당 지표의 심리적 갈등을 2문장으로 한국어 서술",
-    "intensity": "low또는medium또는high 중 하나"
+    "intensity": "low, medium, high 중 하나"
   },
   "persona_gap": {
-    "detected": true또는false,
+    "detected": true 또는 false,
     "comment": "기질과 사회적 페르소나 간 갭을 1~2문장으로 한국어 서술. 갭이 없으면 null"
   },
   "personalized_insight": "이 사람만의 고유한 심리 패턴을 2~3문장으로 한국어 서술",
@@ -99,15 +82,12 @@ ${ambiguous.length > 0 ? ambiguous.join(', ') : '없음'}
   "custom_dont": "응답 데이터 기반 맞춤 경계 사항 1문장"
 }`;
 
-    // ── Gemini API 호출 (모델명 수정)
     const GEMINI_KEY = process.env.GEMINI_API_KEY;
-
     if (!GEMINI_KEY) {
       return res.status(200).json({ success: false, fallback: true, error: 'No API key' });
     }
 
-    // 최신 모델명으로 변경
-    const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${GEMINI_KEY}`;
+    const GEMINI_URL = `[https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$){GEMINI_KEY}`;
 
     const geminiRes = await fetch(GEMINI_URL, {
       method: 'POST',
@@ -116,7 +96,8 @@ ${ambiguous.length > 0 ? ambiguous.join(', ') : '없음'}
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 600,
+          maxOutputTokens: 1000,
+          responseMimeType: "application/json", // JSON 강제 출력 옵션 추가
         },
       }),
     });
@@ -129,8 +110,8 @@ ${ambiguous.length > 0 ? ambiguous.join(', ') : '없음'}
     const geminiData = await geminiRes.json();
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
-    // ── JSON 파싱
-    const clean = rawText.replace(/```json|```/g, '').trim();
+    // 백틱 또는 불필요한 공백 제거
+    const clean = rawText.replace(/```json|```/gi, '').trim();
     const analysis = JSON.parse(clean);
 
     return res.status(200).json({ success: true, analysis, typeKey });
