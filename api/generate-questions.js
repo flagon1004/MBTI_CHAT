@@ -1,5 +1,5 @@
 // api/generate-questions.js — Vercel Serverless Function
-// 사용자 프로필 기반 맞춤 질문 16개 생성 (Gemini 2.0 Flash)
+// 사용자 프로필 기반 맞춤 질문 16개 생성 (Gemini 3.5 Flash)
 
 export default async function handler(req, res) {
 
