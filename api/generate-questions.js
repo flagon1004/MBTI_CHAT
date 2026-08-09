@@ -1,8 +1,6 @@
 // api/generate-questions.js — Vercel Serverless Function
-// 사용자 프로필 기반 맞춤 질문 16개 생성 (Gemini 3.5 Flash)
 
 export default async function handler(req, res) {
-
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -38,7 +36,7 @@ export default async function handler(req, res) {
 3. 선택지 A와 B는 해당 지표의 양극단을 명확히 반영해야 하며, 어느 쪽도 옳고 그름이 없어야 한다.
 4. 한국 문화와 직장 환경을 기준으로 자연스러운 한국어로 작성한다.
 5. scoreA와 scoreB에는 반드시 E, I, S, N, T, F, J, P 중 하나를 입력한다.
-6. 반드시 아래 JSON 배열 형식으로만 응답하고, 다른 텍스트나 마크다운은 절대 포함하지 않는다.
+6. 반드시 JSON 배열 형식으로만 응답하고 다른 설명이나 문구는 생략한다.
 
 [출력 형식]
 [
@@ -51,11 +49,9 @@ export default async function handler(req, res) {
     "scoreA": "E",
     "scoreB": "I"
   }
-]
+]`;
 
-지금 바로 JSON 배열만 출력하십시오.`;
-
-    const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${GEMINI_KEY}`;
+    const GEMINI_URL = `[https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$){GEMINI_KEY}`;
 
     const geminiRes = await fetch(GEMINI_URL, {
       method: 'POST',
@@ -63,10 +59,10 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-        temperature: 0.8,
-        maxOutputTokens: 2000,
-        responseMimeType: "application/json",
-      },
+          temperature: 0.7,
+          maxOutputTokens: 4000, // 토큰 제한 상향 조정 (JSON 잘림 방지)
+          responseMimeType: "application/json",
+        },
       }),
     });
 
@@ -78,11 +74,18 @@ export default async function handler(req, res) {
     const geminiData = await geminiRes.json();
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
-    // JSON 파싱 (마크다운 펜스 제거)
-    const clean = rawText.replace(/^```(?:json)?\s*|\s*```$/gi, '').trim();
+    // 안전한 JSON 문자열 정제
+    let clean = rawText.replace(/```json|```/gi, '').trim();
+    
+    // 만약 JSON 배열 외에 다른 텍스트가 붙은 경우 배열 부분만 추출
+    const firstBracket = clean.indexOf('[');
+    const lastBracket = clean.lastIndexOf(']');
+    if (firstBracket !== -1 && lastBracket !== -1) {
+      clean = clean.substring(firstBracket, lastBracket + 1);
+    }
+
     const questions = JSON.parse(clean);
 
-    // 유효성 검증: 16개 + 필수 필드 확인
     if (!Array.isArray(questions) || questions.length < 16) {
       throw new Error(`질문 수 부족: ${questions.length}개`);
     }
