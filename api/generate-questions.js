@@ -51,7 +51,8 @@ export default async function handler(req, res) {
   }
 ]`;
 
-    const GEMINI_URL = `[https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$){GEMINI_KEY}`;
+    // 백틱(`)을 사용하고 process.env.GEMINI_KEY 로 명시
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${process.env.GEMINI_KEY}`;
 
     const geminiRes = await fetch(GEMINI_URL, {
       method: 'POST',
