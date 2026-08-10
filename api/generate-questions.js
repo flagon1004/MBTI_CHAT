@@ -51,21 +51,20 @@ export default async function handler(req, res) {
   }
 ]`;
 
-    // 백틱(`)을 사용하고 process.env.GEMINI_KEY 로 명시
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${process.env.GEMINI_KEY}`;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${GEMINI_KEY}`;
 
-    const geminiRes = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 4000, // 토큰 제한 상향 조정 (JSON 잘림 방지)
-          responseMimeType: "application/json",
-        },
-      }),
-    });
+const geminiRes = await fetch(GEMINI_URL, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 4000,
+      responseMimeType: "application/json",
+    },
+  }),
+});
 
     if (!geminiRes.ok) {
       const errBody = await geminiRes.text();
