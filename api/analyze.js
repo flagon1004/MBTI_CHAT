@@ -1,5 +1,4 @@
 // api/analyze.js — Vercel Serverless Function
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -10,15 +9,14 @@ export default async function handler(req, res) {
 
   try {
     const { scores, answers, responseTimes, typeKey, userProfile } = req.body;
-
     if (!scores || !typeKey) {
       return res.status(400).json({ error: 'Invalid input' });
     }
 
     const profile = userProfile || { gender: '선택 안 함', age: '선택 안 함', job: '무직', hobbies: [] };
-
     const indicatorMap = ['EI','EI','EI','EI','SN','SN','SN','SN','TF','TF','TF','TF','JP','JP','JP','JP'];
     const rtByIndicator = { EI: [], SN: [], TF: [], JP: [] };
+
     responseTimes.forEach((rt, i) => {
       if (indicatorMap[i]) rtByIndicator[indicatorMap[i]].push(rt);
     });
@@ -35,26 +33,32 @@ export default async function handler(req, res) {
     });
 
     const pct = {
-      E: Math.round(scores.E / 4 * 100), I: Math.round(scores.I / 4 * 100),
-      S: Math.round(scores.S / 4 * 100), N: Math.round(scores.N / 4 * 100),
-      T: Math.round(scores.T / 4 * 100), F: Math.round(scores.F / 4 * 100),
-      J: Math.round(scores.J / 4 * 100), P: Math.round(scores.P / 4 * 100),
+      E: Math.round(scores.E / 4 * 100),
+      I: Math.round(scores.I / 4 * 100),
+      S: Math.round(scores.S / 4 * 100),
+      N: Math.round(scores.N / 4 * 100),
+      T: Math.round(scores.T / 4 * 100),
+      F: Math.round(scores.F / 4 * 100),
+      J: Math.round(scores.J / 4 * 100),
+      P: Math.round(scores.P / 4 * 100),
     };
+
     const ambiguous = [];
     [['E','I'],['S','N'],['T','F'],['J','P']].forEach(([a, b]) => {
       const dominant = Math.max(pct[a], pct[b]);
       if (dominant <= 65) ambiguous.push(`${a}/${b}(${dominant}%)`);
     });
 
+    // 프롬프트에 마크다운 비활성화 및 제이슨 가이드 보완
     const prompt = `당신은 심리측정학 및 임상 상담 전문가입니다. MBTI Step II와 TCI 이론을 기반으로 아래 행동 데이터를 분석하십시오.
 
 [사용자 정보]
-성별: ${profile.gender} | 연령대: ${profile.age} | 직업: ${profile.job} | 취미: ${(profile.hobbies||[]).join(', ')||'없음'}
+성별: ${profile.gender} \vert{} 연령대: ${profile.age} | 직업: ${profile.job} \vert{} 취미:${(profile.hobbies||[]).join(', ')||'없음'}
 
 [기초 MBTI 점수]
 E:${scores.E}/I:${scores.I} | S:${scores.S}/N:${scores.N} | T:${scores.T}/F:${scores.F} | J:${scores.J}/P:${scores.P}
 도출 유형: ${typeKey}
-퍼센트: E${pct.E}% I${pct.I}% | S${pct.S}% N${pct.N}% | T${pct.T}% F${pct.F}% | J${pct.J}% P${pct.P}%
+퍼센트: E${pct.E}\% I${pct.I}% | S${pct.S}% N${pct.N}% | T${pct.T}\% F${pct.F}% | J${pct.J}\% P${pct.P}%
 
 [지표별 평균 응답시간 (ms)]
 E/I: ${rtStats.EI.avg}ms (전체평균 대비 ${rtStats.EI.ratio}배)
@@ -66,7 +70,9 @@ J/P: ${rtStats.JP.avg}ms (전체평균 대비 ${rtStats.JP.ratio}배)
 [중도적 점수 지표]
 ${ambiguous.length > 0 ? ambiguous.join(', ') : '없음'}
 
-아래 JSON 형식으로만 응답하십시오:
+응답 시 마크다운 코드 블록(\`\`\`json 등)을 절대 사용하지 말고, 오직 유효한 단일 JSON 객체 표준 문자열만 출력하십시오.
+
+아래 구조를 따르십시오:
 {
   "cognitive_dissonance": {
     "indicator": "가장 응답 지연이 높은 지표명(예:T/F)",
@@ -74,7 +80,7 @@ ${ambiguous.length > 0 ? ambiguous.join(', ') : '없음'}
     "intensity": "low, medium, high 중 하나"
   },
   "persona_gap": {
-    "detected": true 또는 false,
+    "detected": true,
     "comment": "기질과 사회적 페르소나 간 갭을 1~2문장으로 한국어 서술. 갭이 없으면 null"
   },
   "personalized_insight": "이 사람만의 고유한 심리 패턴을 2~3문장으로 한국어 서술",
@@ -97,7 +103,7 @@ ${ambiguous.length > 0 ? ambiguous.join(', ') : '없음'}
         generationConfig: {
           temperature: 0.7,
           maxOutputTokens: 1000,
-          responseMimeType: "application/json", // JSON 강제 출력 옵션 추가
+          responseMimeType: "application/json",
         },
       }),
     });
@@ -110,9 +116,27 @@ ${ambiguous.length > 0 ? ambiguous.join(', ') : '없음'}
     const geminiData = await geminiRes.json();
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
-    // 백틱 또는 불필요한 공백 제거
-    const clean = rawText.replace(/```json|```/gi, '').trim();
-    const analysis = JSON.parse(clean);
+    // 백틱 정제 및 JSON 부분만 정확히 추출하는 로직 적용
+    let clean = rawText.trim();
+    const match = clean.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (match) {
+      clean = match[1].trim();
+    } else {
+      clean = clean.replace(/```json|```/gi, '').trim();
+    }
+
+    // 파싱 예외 처리 (JSON Parse 실패 시 500 에러 대신 fallback 처리)
+    let analysis;
+    try {
+      analysis = JSON.parse(clean);
+    } catch (jsonErr) {
+      console.error('JSON Parse Error Raw Output:', rawText);
+      return res.status(200).json({
+        success: false,
+        fallback: true,
+        error: `JSON Parse failed: ${jsonErr.message}`
+      });
+    }
 
     return res.status(200).json({ success: true, analysis, typeKey });
 
