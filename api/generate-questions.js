@@ -61,7 +61,7 @@ const geminiRes = await fetch(GEMINI_URL, {
   contents: [{ parts: [{ text: prompt }] }],
   generationConfig: {
     responseMimeType: "application/json", // JSON 전용 응답 강제
-    maxOutputTokens: 4096 // 응답 끊김 방지를 위해 토큰 제한 충분히 확보
+    maxOutputTokens: 8192 // 16문항 전체 생성 시 4096으로는 응답이 중간에 잘려 JSON 파싱 실패가 발생하여 상향
   }
 }),
 });
@@ -72,6 +72,10 @@ const geminiRes = await fetch(GEMINI_URL, {
     }
 
     const geminiData = await geminiRes.json();
+    const finishReason = geminiData.candidates?.[0]?.finishReason;
+    if (finishReason === 'MAX_TOKENS') {
+      throw new Error('Gemini 응답이 maxOutputTokens 한도에 도달해 중간에 잘렸습니다.');
+    }
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
     // 안전한 JSON 문자열 정제
