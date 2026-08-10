@@ -58,7 +58,7 @@ const geminiRes = await fetch(GEMINI_URL, {
   headers: { 'Content-Type': 'application/json' },
   // fetch 요청 body의 generationConfig 설정 예시
   body: JSON.stringify({
-  contents: [...],
+  contents: [{ parts: [{ text: prompt }] }],
   generationConfig: {
     responseMimeType: "application/json", // JSON 전용 응답 강제
     maxOutputTokens: 4096 // 응답 끊김 방지를 위해 토큰 제한 충분히 확보
