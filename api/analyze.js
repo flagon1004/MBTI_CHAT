@@ -87,7 +87,7 @@ ${ambiguous.length > 0 ? ambiguous.join(', ') : '없음'}
       return res.status(200).json({ success: false, fallback: true, error: 'No API key' });
     }
 
-    const GEMINI_URL = `[https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$){GEMINI_KEY}`;
+    const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${GEMINI_KEY}`;
 
     const geminiRes = await fetch(GEMINI_URL, {
       method: 'POST',
